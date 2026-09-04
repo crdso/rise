@@ -1,0 +1,14 @@
+Pasta temporaria criada pelo Claude para verificar o preflight + Fase 3.4.
+
+Como usar:
+  1. Duplo clique em verificar.bat
+  2. Espere terminar (o build leva alguns minutos)
+  3. Volte no chat e avise
+
+O script e SOMENTE LEITURA no git: roda status, diff e log, depois
+tsc --noEmit, npm run lint e npm run build. Nao faz add, commit, push,
+checkout, reset nem stash.
+
+A saida fica em .preflight\output.txt
+
+Terminada a validacao, esta pasta .preflight inteira pode ser apagada.

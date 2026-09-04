@@ -48,12 +48,12 @@ export default function DividasPage() {
   const detailInst = detail ? installments.filter(i=>i.debt_id===detail).sort((a,b)=>a.installment_number-b.installment_number) : [];
 
   const handleCreate = async (data: Parameters<typeof debtService.createDebt>[0]) => {
-    try{ await debtService.createDebt(data as never); push({ title:"Dívida criada"});} catch(e:unknown){ push({ title:"Erro", desc:e instanceof Error?e.message:"", variant:"error"});}
+    try{ await debtService.createDebt(data as never); push({ title:"Dívida criada"});} catch(e:unknown){ push({ title:"Erro", desc:e instanceof Error?e.message:"", variant:"error"}); throw e; }
   };
 
   const handleUpdate = async (data: Parameters<typeof debtService.updateDebt>[1]) => {
     if(!editDebt) return;
-    try{ await debtService.updateDebt(editDebt, data as never); push({ title:"Dívida atualizada"});} catch(e:unknown){ push({ title:"Erro", desc:e instanceof Error?e.message:"", variant:"error"});}
+    try{ await debtService.updateDebt(editDebt, data as never); push({ title:"Dívida atualizada"});} catch(e:unknown){ push({ title:"Erro", desc:e instanceof Error?e.message:"", variant:"error"}); throw e; }
   };
 
   const handlePay = async (data:{ amount:number; notes?:string|null; create_transaction?:boolean; account_id?:string|null; transaction_category?:string|null; installment_id?:string|null})=>{
@@ -79,7 +79,7 @@ export default function DividasPage() {
         </div>
         <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] p-4">
           <p className="text-xs uppercase tracking-wide text-[var(--faint)]">Me devem</p>
-          <p className="text-lg font-bold text-emerald-600">{formatBRL(totals.recv)}</p>
+          <p className="text-lg font-bold text-[var(--positive)]">{formatBRL(totals.recv)}</p>
         </div>
         <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4">
           <p className="text-xs uppercase tracking-wide text-amber-700">Vencendo / atrasadas</p>
@@ -141,7 +141,7 @@ export default function DividasPage() {
         </div>
       )}
 
-      <DebtDialog open={open} onClose={()=>{ setOpen(false); setEditDebt(null);}} onSave={(data)=>{ if(editDebt) handleUpdate(data as never); else handleCreate(data);}} initial={editDebt? debts.find(d=>d.id===editDebt)||null : null} />
+      <DebtDialog open={open} onClose={()=>{ setOpen(false); setEditDebt(null);}} onSave={async (data)=>{ if(editDebt) await handleUpdate(data as never); else await handleCreate(data); }} initial={editDebt? debts.find(d=>d.id===editDebt)||null : null} />
 
       <PaymentDialog open={!!payDebt} onClose={()=>setPayDebt(null)} onPay={handlePay} debt={payDebt? debts.find(d=>d.id===payDebt)||null : null} installments={payDebt? installments.filter(i=>i.debt_id===payDebt):[]} />
 

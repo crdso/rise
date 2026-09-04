@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { transactionSchema } from "@/lib/validators/finance";
+import { transactionPatchSchema } from "@/lib/validators/finance";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isSupabaseConfigured()) return NextResponse.json({ demo: true });
@@ -11,13 +11,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const json = await req.json();
-  const parsed = transactionSchema.partial().safeParse(json);
+  const parsed = transactionPatchSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const p = parsed.data as unknown as { type?: string; amount?: number; description?: string | null; category_id?: string | null; category_name?: string | null; account_id?: string | null; occurred_at?: string; notes?: string | null; payment_method?: string | null; is_recurring?: boolean };
 
   const { data, error } = await supabase.rpc("update_transaction_with_audit", {
     p_id: id,
-    p_patch: json as Record<string, unknown>,
+    // envia o payload VALIDADO, não o json cru
+    p_patch: parsed.data as unknown as Record<string, unknown>,
   });
 
   if (error) {

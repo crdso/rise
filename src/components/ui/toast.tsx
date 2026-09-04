@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, AlertCircle, X } from "lucide-react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
 
 type Toast = { id: string; title: string; desc?: string; variant?: "success" | "error" };
 const Ctx = createContext<{ push: (t: Omit<Toast,"id">) => void } | null>(null);

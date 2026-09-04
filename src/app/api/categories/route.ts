@@ -23,16 +23,14 @@ export async function POST(req: Request) {
   const json = await req.json();
   const parsed = categorySchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const name = parsed.data.name.trim();
-  // tenta inserir com ON CONFLICT (índice lower(trim(name))) para evitar race
-  const { data: inserted, error: insertErr } = await supabase.from("transaction_categories").insert({ user_id: user.id, name, icon: parsed.data.icon || null, color: parsed.data.color || null }).select().single();
-  if (!insertErr && inserted) return NextResponse.json({ data: inserted });
-  // se conflitou (duplicata case-insensitive), busca existente
-  if (insertErr && (insertErr.message.includes("duplicate") || insertErr.code === "23505")) {
-    const { data: existing } = await supabase.from("transaction_categories").select("*").eq("user_id", user.id);
-    const found = (existing as { id: string; name: string }[] | null)?.find((c) => c.name.toLowerCase().trim() === name.toLowerCase().trim());
-    if (found) return NextResponse.json({ data: found });
-  }
-  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
-  return NextResponse.json({ data: inserted });
+
+  // 010: escrita direta em transaction_categories foi bloqueada por RLS.
+  // A RPC faz dedup case-insensitive e audita apenas quando de fato cria.
+  const { data, error } = await supabase.rpc("create_category_with_audit", {
+    p_name: parsed.data.name.trim(),
+    p_icon: parsed.data.icon || null,
+    p_color: parsed.data.color || null,
+  });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ data });
 }

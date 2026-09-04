@@ -1,7 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { useFinanceStore } from "@/lib/store/financeStore";
 import type { Account, Category, Transaction } from "@/types/finance";
-import { FINANCIAL_BRANDS } from "@/lib/brands/registry";
+import { FINANCIAL_BRANDS, inferBrandKey } from "@/lib/brands/registry";
 
 function uid() { return crypto.randomUUID(); }
 
@@ -13,11 +13,11 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function inferBrand(name: string): { brand_domain: string | null; brand_key: string | null } {
-  const norm = name.toLowerCase().trim();
-  for (const [k, v] of Object.entries(FINANCIAL_BRANDS)) {
-    if (norm.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(norm)) return { brand_domain: v.domain, brand_key: k };
-  }
-  return { brand_domain: null, brand_key: null };
+  // Casamento por alias com limite de palavra (registry), não por substring solta:
+  // "Conta corrente" não pode virar "Banco Pan" só por conter as letras de "pan".
+  const key = inferBrandKey(name);
+  if (!key) return { brand_domain: null, brand_key: null };
+  return { brand_domain: FINANCIAL_BRANDS[key].domain, brand_key: key };
 }
 
 // Demo helpers (local store)

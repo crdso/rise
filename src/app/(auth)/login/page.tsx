@@ -1,14 +1,17 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, ArrowRight, Loader2, Check } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { setDemoSession } from "@/lib/auth/demo";
+import { RiseMark, RiseLogo } from "@/components/rise/RiseMark";
+import { SpotlightSurface } from "@/components/rise/SpotlightSurface";
+import { LoginSuccess } from "@/components/rise/LoginSuccess";
+import { usePrefersReducedMotion } from "@/components/theme-provider";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -19,123 +22,221 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
   const demoMode = !isSupabaseConfigured();
+  const reduced = usePrefersReducedMotion();
 
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || success) return;
     setError("");
-    if (!email.trim() || !password.trim()) { setError("Informe e-mail e senha."); return; }
+    if (!email.trim() || !password.trim()) {
+      setError("Informe e-mail e senha.");
+      return;
+    }
     setLoading(true);
     try {
       if (demoMode) {
-        await new Promise((r) => setTimeout(r, 650));
+        await new Promise((r) => setTimeout(r, 500));
         setDemoSession(email.trim());
-        setSuccess(true);
-        setTimeout(() => router.push("/"), 550);
-        return;
+      } else {
+        const supabase = createClient();
+        if (!supabase) throw new Error("Supabase não configurado.");
+        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError) throw authError;
       }
-      const supabase = createClient();
-      if (!supabase) throw new Error("Supabase não configurado.");
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
       setSuccess(true);
-      setTimeout(() => router.push("/"), 550);
+      // tempo da animação de conclusão antes de trocar de tela
+      setTimeout(() => router.push("/"), reduced ? 320 : 1000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Falha ao entrar";
-      setError(msg.replace("@supabase/ssr:","").trim());
-    } finally { setLoading(false); }
+      const raw = err instanceof Error ? err.message : "Falha ao entrar";
+      const msg = /invalid login credentials/i.test(raw)
+        ? "E-mail ou senha incorretos."
+        : raw.replace("@supabase/ssr:", "").trim();
+      setError(msg);
+      setLoading(false);
+    }
   };
 
+  const drift = reduced
+    ? {}
+    : { animate: { x: [0, 24, 0], y: [0, -18, 0] }, transition: { duration: 22, repeat: Infinity, ease: "easeInOut" as const } };
+  const drift2 = reduced
+    ? {}
+    : { animate: { x: [0, -28, 0], y: [0, 16, 0] }, transition: { duration: 27, repeat: Infinity, ease: "easeInOut" as const } };
+
   return (
-    <div className="min-h-[100dvh] bg-[var(--background)] relative overflow-hidden flex">
-      {/* Ambient */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[var(--background)]" />
-        <div className="absolute -top-[30%] left-[10%] h-[820px] w-[820px] rounded-full blur-[120px] opacity-[0.45]" style={{ background: "radial-gradient(circle, var(--ambient-1), transparent 70%)" }} />
-        <div className="absolute top-[18%] right-[8%] h-[560px] w-[560px] rounded-full blur-[110px] opacity-[0.35]" style={{ background: "radial-gradient(circle, var(--ambient-2), transparent 70%)" }} />
-        <div className="absolute bottom-[-20%] left-[30%] h-[600px] w-[600px] rounded-full blur-[100px] opacity-[0.2]" style={{ background: "radial-gradient(circle, var(--ambient-3), transparent 70%)" }} />
-        {/* sutil composição 4 elementos estáticos - preparação Etapa 6 */}
-        <div className="hidden lg:block absolute top-1/2 left-[18%] -translate-y-1/2">
-          <div className="relative h-[420px] w-[420px]">
-            {[0,1,2,3].map((i) => (
-              <div key={i} className="absolute h-[7px] w-[7px] rounded-full bg-[var(--accent)] opacity-20" style={{
-                left: `${50 + 42 * Math.cos((i*90+15)*Math.PI/180)}%`,
-                top: `${50 + 42 * Math.sin((i*90+15)*Math.PI/180)}%`,
-                boxShadow: "0 0 14px var(--glow)",
-              }} />
-            ))}
-            <div className="absolute inset-[34%] rounded-full border border-[var(--border)] opacity-[0.35]" />
-            <div className="absolute inset-[44%] rounded-full border border-[var(--border)] opacity-[0.25]" />
-          </div>
-        </div>
+    <div className="relative min-h-[100dvh] bg-[var(--background)] overflow-hidden">
+      {/* fundo profundo + movimento ambiental muito lento */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        <motion.div
+          {...drift}
+          className="absolute -top-[28%] -left-[10%] h-[780px] w-[780px] rounded-full blur-[130px] opacity-[0.5]"
+          style={{ background: "radial-gradient(circle, var(--ambient-1), transparent 68%)" }}
+        />
+        <motion.div
+          {...drift2}
+          className="absolute top-[12%] -right-[12%] h-[620px] w-[620px] rounded-full blur-[120px] opacity-[0.4]"
+          style={{ background: "radial-gradient(circle, var(--ambient-2), transparent 68%)" }}
+        />
+        <div
+          className="absolute -bottom-[30%] left-[25%] h-[620px] w-[620px] rounded-full blur-[110px] opacity-[0.28]"
+          style={{ background: "radial-gradient(circle, var(--ambient-3), transparent 68%)" }}
+        />
+        {/* vinheta para o formulário não competir com o fundo */}
+        <div
+          className="absolute inset-0"
+          style={{ background: "radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(0,0,0,0.42) 100%)" }}
+        />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 flex-1 grid lg:grid-cols-[1.05fr_0.95fr] min-h-[100dvh]">
-        {/* Left - brand minimal */}
-        <div className="hidden lg:flex flex-col justify-between p-10 pl-12 pr-8">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-white text-black grid place-items-center font-bold text-sm">R</div>
-            <span className="text-[13px] font-semibold tracking-[0.14em] uppercase text-white/85">RISE</span>
+      {/* luz que segue o cursor — só desktop com ponteiro fino */}
+      <SpotlightSurface size={620} />
+
+      <div className="relative z-10 min-h-[100dvh] grid lg:grid-cols-[1.12fr_0.88fr]">
+        {/* ------- painel de marca (desktop) ------- */}
+        <div className="hidden lg:flex flex-col justify-between p-12 pr-8">
+          <RiseLogo size={32} />
+
+          <div className="relative max-w-[460px]">
+            {/* marca em escala, como elemento gráfico */}
+            <div className="absolute -top-[190px] -left-[40px] text-[var(--accent)] opacity-[0.07] pointer-events-none" aria-hidden>
+              <RiseMark size={340} />
+            </div>
+            <h1 className="relative text-[52px] font-semibold tracking-[-0.03em] leading-[0.94]">
+              Tudo o que você
+              <br />
+              precisa acompanhar.
+            </h1>
+            <p className="relative mt-5 text-[15px] leading-relaxed text-[var(--muted-foreground)] max-w-[380px]">
+              Finanças, calendário, lembretes e escola em um só lugar — com histórico e auditoria de tudo que acontece.
+            </p>
           </div>
-          <div className="max-w-[420px]">
-            <p className="text-[11px] tracking-[0.16em] uppercase text-white/45 font-medium">Bem-vindo</p>
-            <h1 className="mt-3 text-[44px] font-semibold tracking-tight leading-[0.92] text-white">Entre<br />no RISE.</h1>
-          </div>
-          <p className="text-xs text-white/30">© 2026 · acesso privado</p>
+
+          <p className="text-xs text-[var(--faint)]">Acesso privado · sem cadastro público</p>
         </div>
 
-        {/* Right - form */}
-        <div className="flex items-center justify-center p-6 sm:p-10">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.16,1,0.3,1] }} className="w-full max-w-[380px]">
-            <div className="lg:hidden flex items-center gap-2.5 mb-8">
-              <div className="h-8 w-8 rounded-lg bg-[var(--foreground)] text-[var(--background)] grid place-items-center font-bold text-sm">R</div>
-              <span className="text-sm font-semibold">RISE</span>
+        {/* ------- formulário ------- */}
+        <div className="flex items-center justify-center p-5 sm:p-8 lg:p-10">
+          <motion.div
+            initial={reduced ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-[400px]"
+          >
+            {/* marca no mobile */}
+            <div className="lg:hidden mb-8 flex flex-col items-center text-center">
+              <RiseLogo size={34} />
+              <h1 className="mt-6 text-[26px] font-semibold tracking-[-0.02em] leading-tight">
+                Tudo o que você precisa acompanhar.
+              </h1>
             </div>
 
-            <div className="rounded-[22px] bg-[var(--card)] border border-[var(--border)] p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
-              <div className="flex items-start justify-between gap-3 mb-5">
-                <div>
-                  <h2 className="text-[18px] font-semibold tracking-tight leading-none">Entrar</h2>
-                  <p className="text-xs text-[var(--muted-foreground)] mt-1.5">Acesso privado · sem cadastro público</p>
-                </div>
-                {demoMode && <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--card-soft)] px-2.5 py-1 text-[10px] font-medium tracking-wide text-[var(--muted-foreground)]">Modo demonstração</span>}
+            <div className="rounded-[20px] border border-[var(--border)] bg-[var(--card)]/85 backdrop-blur-xl p-6 sm:p-7 shadow-[0_28px_70px_rgba(0,0,0,0.5)]">
+              <div className="flex items-start justify-between gap-3 mb-6">
+                <h2 className="text-[19px] font-semibold tracking-tight leading-none">Entrar</h2>
+                {demoMode && (
+                  <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--card-soft)] px-2.5 py-1 text-[10px] font-medium tracking-wide text-[var(--muted-foreground)]">
+                    Demonstração
+                  </span>
+                )}
               </div>
 
               <AnimatePresence mode="wait">
                 {success ? (
-                  <motion.div key="s" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="py-10 text-center">
-                    <div className="mx-auto h-12 w-12 rounded-full bg-emerald-500 text-white grid place-items-center"><Check className="h-6 w-6" /></div>
-                    <p className="mt-3 text-sm font-medium">Bem-vindo de volta.</p>
-                    <p className="text-xs text-[var(--muted-foreground)]">Entrando…</p>
+                  <motion.div key="ok" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <LoginSuccess />
                   </motion.div>
                 ) : (
-                  <motion.form key="f" onSubmit={handle} className="space-y-3.5" exit={{ opacity: 0, y: -6 }}>
-                    {error && <div className="rounded-xl border border-red-500/15 bg-red-500/10 px-3 py-2 text-xs text-red-600">{error}</div>}
+                  <motion.form key="form" onSubmit={handle} className="space-y-4" exit={{ opacity: 0, y: -8 }}>
+                    <AnimatePresence>
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div
+                            role="alert"
+                            className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-300"
+                          >
+                            <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span>{error}</span>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium tracking-wide text-[var(--faint)] uppercase">E-mail</label>
-                      <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@rise.app" type="email" required autoComplete="email" className="h-10 rounded-xl" />
+                      <label htmlFor="email" className="text-[11px] font-medium tracking-[0.08em] text-[var(--faint)] uppercase">
+                        E-mail
+                      </label>
+                      <Input
+                        id="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="voce@exemplo.com"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        inputMode="email"
+                        disabled={loading}
+                        className="h-11 rounded-xl bg-[var(--card-soft)]"
+                      />
                     </div>
+
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-medium tracking-wide text-[var(--faint)] uppercase">Senha</label>
-                        <Link href="#" className="text-[11px] text-[var(--faint)] hover:text-[var(--foreground)]">Esqueci minha senha</Link>
-                      </div>
+                      <label htmlFor="password" className="text-[11px] font-medium tracking-[0.08em] text-[var(--faint)] uppercase">
+                        Senha
+                      </label>
                       <div className="relative">
-                        <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" type={show ? "text" : "password"} required autoComplete="current-password" className="pr-10 h-10 rounded-xl" />
-                        <button type="button" onClick={() => setShow(v=>!v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--faint)]" aria-label={show ? "Ocultar senha" : "Mostrar senha"}>
+                        <Input
+                          id="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          type={show ? "text" : "password"}
+                          required
+                          autoComplete="current-password"
+                          disabled={loading}
+                          className="pr-11 h-11 rounded-xl bg-[var(--card-soft)]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShow((v) => !v)}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-lg text-[var(--faint)] hover:text-[var(--foreground)] transition-colors"
+                          aria-label={show ? "Ocultar senha" : "Mostrar senha"}
+                        >
                           {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
-                    <Button type="submit" disabled={loading} className="w-full h-10 rounded-full mt-1">
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      {loading ? "Entrando..." : "Entrar"}
-                      {!loading && <ArrowRight className="h-4 w-4" />}
-                    </Button>
+
+                    {/* CTA principal — único lugar do app com a borda giratória */}
+                    <div className="rise-rotating-border rounded-full mt-1">
+                      <Button type="submit" disabled={loading} aria-busy={loading} className="w-full h-11 rounded-full relative z-[2]">
+                        {loading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" /> Entrando…
+                          </>
+                        ) : (
+                          <>
+                            Entrar <ArrowRight className="h-4 w-4" />
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    <p className="text-[11px] text-center text-[var(--faint)] pt-1">
+                      {demoMode
+                        ? "Sem Supabase configurado: qualquer e-mail abre o modo demonstração."
+                        : "Acesso privado. Não há cadastro público."}
+                    </p>
                   </motion.form>
                 )}
               </AnimatePresence>
             </div>
+
+            <p className="lg:hidden mt-6 text-center text-[11px] text-[var(--faint)]">Acesso privado</p>
           </motion.div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { useDebtStore, debtPaidAmount, debtRemaining } from "@/lib/store/debtStore";
+import { useDebtStore, debtPaidAmount, installmentStatus as deriveInstallmentStatus } from "@/lib/store/debtStore";
+import { addMonthsToDateKey } from "@/lib/timezone";
 import type { Debt, DebtPayment, DebtInstallment } from "@/types/debt";
 
 function uid(){ return crypto.randomUUID(); }
@@ -9,30 +10,6 @@ async function api<T>(url:string, init?:RequestInit): Promise<T>{
   const j=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(j.error || `API ${r.status}`);
   return j.data as T;
-}
-
-function addMonthsPreserveEOM(dateStr:string, monthsToAdd:number): string{
-  const [y,m,d]=dateStr.split("-").map(Number);
-  let targetMonth=m+monthsToAdd;
-  let targetYear=y + Math.floor((targetMonth-1)/12);
-  targetMonth = ((targetMonth-1)%12)+1;
-  const lastDay=new Date(targetYear, targetMonth, 0).getDate();
-  const day=Math.min(d, lastDay);
-  const mm=String(targetMonth).padStart(2,"0");
-  const dd=String(day).padStart(2,"0");
-  return `${targetYear}-${mm}-${dd}`;
-}
-
-function installmentStatus(amount:number, paid:number, dueDate:string): DebtInstallment["status"]{
-  if(paid >= amount -0.005) return "paid";
-  if(paid>0 && paid < amount){
-    const today=new Date(new Date().toLocaleString("en-US",{timeZone:"America/Sao_Paulo"})).toISOString().slice(0,10);
-    if(dueDate < today) return "overdue";
-    return "partial";
-  }
-  const today=new Date(new Date().toLocaleString("en-US",{timeZone:"America/Sao_Paulo"})).toISOString().slice(0,10);
-  if(dueDate < today) return "overdue";
-  return "pending";
 }
 
 export const debtService = {
@@ -47,7 +24,7 @@ export const debtService = {
         const per=Math.floor(debt.amount/debt.installments_count*100)/100;
         const rem=+(debt.amount - per*(debt.installments_count-1)).toFixed(2);
         for(let i=1;i<=debt.installments_count;i++){
-          const due=addMonthsPreserveEOM(data.first_due_date, i-1);
+          const due=addMonthsToDateKey(data.first_due_date, i-1);
           const inst:DebtInstallment={ id:uid(), user_id:"demo", debt_id:debt.id, installment_number:i, amount:i===debt.installments_count?rem:per, due_date:due, status:"pending", created_at:now };
           useDebtStore.getState().upsertInstallment(inst);
         }
@@ -108,8 +85,7 @@ export const debtService = {
       useDebtStore.getState().upsertPayment(pay);
       if(data.installment_id){
         const inst=useDebtStore.getState().installments.find(i=>i.id===data.installment_id)!;
-        const paidInst=useDebtStore.getState().payments.filter(p=>p.installment_id===data.installment_id).reduce((s,p)=>s+p.amount,0);
-        const status=installmentStatus(inst.amount, paidInst, inst.due_date);
+        const status=deriveInstallmentStatus(inst, useDebtStore.getState().payments);
         useDebtStore.getState().upsertInstallment({ ...inst, status });
       }
       return pay;

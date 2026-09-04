@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+// (componente legado — substituído pelos widgets do painel; marcado para remoção)
 import { GraduationCap, CalendarDays, Bell } from "lucide-react";
 
 const kindIcon = { school: GraduationCap, event: CalendarDays, reminder: Bell };

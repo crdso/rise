@@ -1,10 +1,19 @@
 {
   "name": "RISE",
   "short_name": "RISE",
-  "description": "Painel pessoal premium",
+  "description": "Painel pessoal: finanças, calendário, lembretes e escola.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#060A14",
-  "theme_color": "#060A14",
-  "icons": []
+  "orientation": "portrait",
+  "background_color": "#080913",
+  "theme_color": "#080913",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["productivity", "finance"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }

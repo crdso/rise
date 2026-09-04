@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { Account, Category, Transaction, AuditEntry } from "@/types/finance";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { saoPauloMonthKey } from "@/lib/timezone";
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: "c1", name: "Alimentação", icon: "Utensils", color: "#F59E0B", created_at: new Date().toISOString() },
@@ -132,9 +133,9 @@ export function calcAccountBalance(acc: Account, txs: Transaction[]) {
 
 // Analytics helpers para gastos como foco (não só saldo)
 export function spendingByCategory(transactions: Transaction[], categories: Category[], month?: Date) {
-  const target = month || new Date();
-  const m = target.getMonth(), y = target.getFullYear();
-  const filtered = transactions.filter(t => t.type === "expense" && new Date(t.occurred_at).getMonth()===m && new Date(t.occurred_at).getFullYear()===y);
+  // Agrupamento pelo mes civil de Sao Paulo (nao pelo fuso do dispositivo).
+  const monthKey = saoPauloMonthKey(month || new Date());
+  const filtered = transactions.filter(t => t.type === "expense" && saoPauloMonthKey(t.occurred_at) === monthKey);
   const total = filtered.reduce((s,t)=>s+t.amount,0);
   const byCat: Record<string, { name: string; amount: number; pct: number }> = {};
   for (const t of filtered) {

@@ -1,221 +1,378 @@
 "use client";
-import { motion } from "framer-motion";
-import { ArrowUpRight, TrendingDown, Wallet, GraduationCap } from "lucide-react";
-import { formatBRL, greeting } from "@/lib/utils";
-import { headerDate, demoFinance, demoAgendaToday, demoSchool } from "@/lib/fixtures";
-import { useFinanceStore, calcAccountBalance } from "@/lib/store/financeStore";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, Reorder, useDragControls } from "framer-motion";
+import { LayoutGrid, Check, RotateCcw, Maximize2, Minimize2, Sparkles, Loader2 } from "lucide-react";
+import { greeting, headerDate } from "@/lib/utils";
+import { useFinanceStore } from "@/lib/store/financeStore";
 import { useDebtStore, debtRemaining, debtStatus } from "@/lib/store/debtStore";
 import { useCalendarStore } from "@/lib/store/calendarStore";
+import { useReminderStore, remindersForToday, remindersUpcoming, reminderViewStatus } from "@/lib/store/reminderStore";
+import { useImportantStore, pinnedItems } from "@/lib/store/importantStore";
+import { useSchoolStore, upcomingTasks, taskViewStatus } from "@/lib/store/schoolStore";
+import { useDashboardStore, resolveOrder, WIDGET_META, type WidgetId } from "@/lib/store/dashboardStore";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { SectionHeader, Surface } from "@/components/rise/Section";
-import { AccountTile } from "@/components/rise/AccountTile";
-import { AgendaItem, AgendaList } from "@/components/rise/Agenda";
-import { useMemo } from "react";
+import { settingsService } from "@/lib/services/settingsService";
+import { useToast } from "@/components/ui/toast";
+import { Button } from "@/components/ui/button";
+import { WidgetShell } from "@/components/rise/dashboard/WidgetShell";
+import {
+  SpendWidget,
+  CategoriesWidget,
+  TodayWidget,
+  UpcomingWidget,
+  DebtsWidget,
+  AccountsWidget,
+  ImportantWidget,
+  SchoolWidget,
+  WidgetLink,
+  type AgendaEntry,
+  type UpcomingEntry,
+} from "@/components/rise/dashboard/widgets";
+import {
+  accountBalance,
+  categoryBreakdown,
+  currentMonthKey,
+  lastNDays,
+  monthStats,
+  pctChange,
+  previousMonthKey,
+} from "@/lib/finance/analytics";
+import { saoPauloDateKey, saoPauloTodayKey, addDaysToDateKey } from "@/lib/timezone";
 
-function Sparkline({ data }: { data: number[] }) {
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const w = 120, h = 32;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / (max - min || 1)) * h;
-    return `${x},${y}`;
-  }).join(" ");
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
-      <polyline fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" points={points} opacity={0.9} />
-      <polyline fill="none" stroke="var(--accent)" strokeWidth="6" strokeLinejoin="round" strokeLinecap="round" points={points} opacity={0.08} />
-    </svg>
-  );
+const UPCOMING_DAYS = 7;
+
+function timeSP(iso: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(iso));
 }
 
 export default function Dashboard() {
-  const todayLabel = useMemo(() => headerDate(new Date()), []);
-  const greet = useMemo(() => greeting("Ezequias"), []);
   const { accounts, transactions, categories } = useFinanceStore();
   const { debts, payments, installments } = useDebtStore();
   const { events } = useCalendarStore();
-  const debtSummary = useMemo(() => {
-    const owed = debts.filter((d) => d.kind === "owed" && !d.archived_at).slice(0,2);
-    const recv = debts.filter((d) => d.kind === "receivable" && !d.archived_at).slice(0,1);
-    return { owed, recv, hasReal: debts.length > 0 };
-  }, [debts]);
-  const todayEvents = useMemo(() => {
-    const todayStr = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).toISOString().slice(0,10);
-    const todays = events.filter(e => {
-      const ds = new Date(e.starts_at).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-      // en-CA gives YYYY-MM-DD
-      const evDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date(e.starts_at));
-      return evDate === todayStr;
-    }).slice(0,4);
-    return todays;
-  }, [events]);
+  const { reminders } = useReminderStore();
+  const { items: importantItems } = useImportantStore();
+  const { tasks: schoolTasks } = useSchoolStore();
+  const { order, hidden, spans, editing, setOrder, toggleHidden, toggleSpan, setEditing, reset } = useDashboardStore();
+  const { push } = useToast();
+
+  const [seeding, setSeeding] = useState(false);
   const isDemo = !isSupabaseConfigured();
-  const financeLive = useMemo(() => {
-    const now = new Date();
-    const month = now.getMonth();
-    const year = now.getFullYear();
-    const monthTxs = transactions.filter((t) => {
-      const d = new Date(t.occurred_at);
-      return d.getMonth() === month && d.getFullYear() === year;
-    });
-    const exp = monthTxs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-    const inc = monthTxs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-    let total = 0;
-    for (const a of accounts) if (a.is_active) total += calcAccountBalance(a, transactions);
-    const hasData = transactions.length > 0;
-    const useDemo = isDemo && !hasData;
+  const todayKey = saoPauloTodayKey();
+  const monthKey = currentMonthKey();
+
+  const todayLabel = useMemo(() => headerDate(new Date()), []);
+  const greet = useMemo(() => greeting("Ezequias"), []);
+
+  /* ---------- números reais, sem fixture ---------- */
+  const finance = useMemo(() => {
+    const current = monthStats(transactions, monthKey);
+    const previous = monthStats(transactions, previousMonthKey(monthKey));
+    const { total, slices } = categoryBreakdown(transactions, categories, monthKey);
     return {
-      balance: useDemo ? demoFinance.balance : total,
-      expenseMonth: useDemo ? demoFinance.expenseMonth : exp,
-      incomeMonth: useDemo ? demoFinance.incomeMonth : inc,
-      topCat: (() => {
-        if (useDemo) return demoFinance.topCategory;
-        if (!hasData) return "—";
-        const byCat: Record<string, number> = {};
-        monthTxs.filter((t) => t.type === "expense").forEach((t) => {
-          const name = categories.find((c) => c.id === t.category_id)?.name || "Outros";
-          byCat[name] = (byCat[name] || 0) + t.amount;
-        });
-        const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
-        return top ? top[0] : "—";
-      })(),
+      expense: current.expense,
+      income: current.income,
+      pct: pctChange(current.expense, previous.expense),
+      series: lastNDays(transactions, 30, "expense"),
+      slices,
+      categoryTotal: total,
+      topCategory: slices[0]?.name ?? null,
+      hasData: transactions.length > 0,
     };
-  }, [accounts, transactions, categories]);
+  }, [transactions, categories, monthKey]);
+
+  const todayEntries = useMemo<AgendaEntry[]>(() => {
+    const evs: AgendaEntry[] = events
+      .filter((e) => saoPauloDateKey(e.starts_at) === todayKey)
+      .map((e) => ({
+        id: `ev-${e.id}`,
+        kind: e.category === "school" ? "school" : "event",
+        title: e.title,
+        time: e.all_day ? "dia inteiro" : timeSP(e.starts_at),
+        meta:
+          e.category === "school"
+            ? "Escola"
+            : e.category === "finance"
+              ? "Financeiro"
+              : e.category === "important"
+                ? "Importante"
+                : "Pessoal",
+        sortAt: e.all_day ? 0 : +new Date(e.starts_at),
+      }));
+
+    const rems: AgendaEntry[] = remindersForToday(reminders, todayKey).map((r) => {
+      const overdue = reminderViewStatus(r) === "overdue";
+      return {
+        id: `rm-${r.id}`,
+        kind: "reminder" as const,
+        title: r.title,
+        time: r.due_at ? timeSP(r.due_at) : "sem hora",
+        meta: overdue ? "Lembrete atrasado" : "Lembrete",
+        overdue,
+        sortAt: r.due_at ? +new Date(r.due_at) : 0,
+      };
+    });
+
+    return [...evs, ...rems].sort((a, b) => a.sortAt - b.sortAt);
+  }, [events, reminders, todayKey]);
+
+  const upcomingEntries = useMemo<UpcomingEntry[]>(() => {
+    const limit = addDaysToDateKey(todayKey, UPCOMING_DAYS);
+    const evs: UpcomingEntry[] = events
+      .filter((e) => {
+        const k = saoPauloDateKey(e.starts_at);
+        return k > todayKey && k <= limit;
+      })
+      .map((e) => ({
+        id: `ev-${e.id}`,
+        kind: "event" as const,
+        title: e.title,
+        dateKey: saoPauloDateKey(e.starts_at),
+        at: +new Date(e.starts_at),
+      }));
+    const rems: UpcomingEntry[] = remindersUpcoming(reminders, UPCOMING_DAYS, todayKey).map((r) => ({
+      id: `rm-${r.id}`,
+      kind: "reminder" as const,
+      title: r.title,
+      dateKey: saoPauloDateKey(r.due_at as string),
+      at: +new Date(r.due_at as string),
+    }));
+    return [...evs, ...rems].sort((a, b) => a.at - b.at).slice(0, 6);
+  }, [events, reminders, todayKey]);
+
+  const visibleOrder = useMemo(() => resolveOrder(order), [order]);
+
+  // Sincroniza o layout com o servidor. O primeiro render é ignorado: ele é
+  // apenas a hidratação do localStorage, não uma escolha do usuário.
+  const firstLayoutRender = useRef(true);
+  useEffect(() => {
+    if (firstLayoutRender.current) {
+      firstLayoutRender.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      void settingsService.save({ dashboard: { order, hidden, spans } });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [order, hidden, spans]);
+  const isEmpty =
+    transactions.length === 0 &&
+    accounts.length === 0 &&
+    events.length === 0 &&
+    reminders.length === 0 &&
+    importantItems.length === 0 &&
+    schoolTasks.length === 0 &&
+    debts.length === 0;
+
+  const loadDemo = async () => {
+    if (seeding) return;
+    setSeeding(true);
+    try {
+      const { seedDemoData } = await import("@/lib/fixtures");
+      await seedDemoData();
+      push({ title: "Dados de demonstração carregados" });
+    } catch (e: unknown) {
+      push({ title: "Erro", desc: e instanceof Error ? e.message : "", variant: "error" });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  /* ---------- corpo de cada widget ---------- */
+  const renderBody = (id: WidgetId) => {
+    switch (id) {
+      case "spend":
+        return (
+          <SpendWidget
+            expense={finance.expense}
+            income={finance.income}
+            pct={finance.pct}
+            series={finance.series}
+            topCategory={finance.topCategory}
+            hasData={finance.hasData}
+          />
+        );
+      case "categories":
+        return <CategoriesWidget slices={finance.slices} total={finance.categoryTotal} />;
+      case "today":
+        return <TodayWidget entries={todayEntries} />;
+      case "upcoming":
+        return <UpcomingWidget entries={upcomingEntries} days={UPCOMING_DAYS} />;
+      case "debts":
+        return (
+          <DebtsWidget
+            debts={debts}
+            payments={payments}
+            installments={installments}
+            statusOf={debtStatus}
+            remainingOf={debtRemaining}
+          />
+        );
+      case "accounts":
+        return <AccountsWidget accounts={accounts} transactions={transactions} balanceOf={accountBalance} />;
+      case "important":
+        return <ImportantWidget items={pinnedItems(importantItems)} />;
+      case "school":
+        return (
+          <SchoolWidget
+            tasks={upcomingTasks(schoolTasks, UPCOMING_DAYS, todayKey)}
+            overdueOf={(t) => taskViewStatus(t) === "overdue"}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  const actionFor = (id: WidgetId) => {
+    switch (id) {
+      case "spend":
+      case "categories":
+        return <WidgetLink href="/financas" label="Finanças" />;
+      case "today":
+      case "upcoming":
+        return <WidgetLink href="/calendario" label="Calendário" />;
+      case "debts":
+        return <WidgetLink href="/financas/dividas" label="Dívidas" />;
+      case "accounts":
+        return <WidgetLink href="/financas/contas" label="Gerenciar" />;
+      case "important":
+        return <WidgetLink href="/importantes" label="Ver todos" />;
+      case "school":
+        return <WidgetLink href="/escola" label="Escola" />;
+      default:
+        return null;
+    }
+  };
+
+  const spanOf = (id: WidgetId) => spans[id] ?? WIDGET_META[id].span;
+
   return (
-    <div className="space-y-7">
-      {/* Greeting */}
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-        <h1 className="text-[26px] sm:text-[30px] font-semibold tracking-tight leading-none">{greet}</h1>
-        <p className="text-sm text-[var(--muted-foreground)] mt-1.5 capitalize">{todayLabel} · tudo sob controle.</p>
-      </motion.div>
+    <div className="space-y-6">
+      {/* cabeçalho */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <h1 className="text-[25px] sm:text-[29px] font-semibold tracking-[-0.02em] leading-none">{greet}</h1>
+          <p className="text-[13px] text-[var(--muted-foreground)] mt-2 first-letter:uppercase">{todayLabel}</p>
+        </motion.div>
 
-      {/* Editorial grid */}
-      <div className="grid lg:grid-cols-[1.35fr_0.9fr] gap-5">
-        {/* Finance hero */}
-        <Surface className="p-6 sm:p-7 overflow-hidden relative">
-          <div className="absolute inset-0 pointer-events-none opacity-[0.55]" style={{ background: "radial-gradient(600px 220px at 30% 0%, var(--accent-soft), transparent 70%)" }} />
-          <div className="relative">
-            <SectionHeader title="Financeiro" subtitle="Resumo do mês" action={<a href="/financas" className="text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] inline-flex items-center gap-1">Ver finanças <ArrowUpRight className="h-3.5 w-3.5" /></a>} />
-            <div className="mt-5">
-              <p className="text-[11px] tracking-[0.14em] uppercase font-medium text-[var(--faint)]">Saldo total</p>
-              <p className="text-[32px] sm:text-[36px] font-bold tracking-tight leading-none mt-1">{formatBRL(financeLive.balance)}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                {isDemo && transactions.length===0 ? (
-                  <>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300"><TrendingDown className="h-3 w-3" /> {demoFinance.deltaVsPrev}% vs mês anterior</span>
-                    <span className="text-[var(--muted-foreground)]">Maior gasto em {demoFinance.biggestDay.date} · {formatBRL(demoFinance.biggestDay.amount)}</span>
-                  </>
-                ) : (
-                  <span className="text-[var(--muted-foreground)]">{transactions.length===0 ? "Sem dados ainda" : `${financeLive.expenseMonth>0 ? "Maior gasto" : "Nenhum gasto"} · ${financeLive.topCat}`}</span>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              <div className="rounded-xl bg-[var(--card-soft)] border border-[var(--border)] p-3">
-                <p className="text-[11px] text-[var(--faint)] uppercase tracking-wide font-medium">Gastos</p>
-                <p className="text-sm font-bold mt-1">{formatBRL(financeLive.expenseMonth)}</p>
-                <p className="text-[11px] text-[var(--muted-foreground)]">{financeLive.topCat}</p>
-              </div>
-              <div className="rounded-xl bg-[var(--card-soft)] border border-[var(--border)] p-3">
-                <p className="text-[11px] text-[var(--faint)] uppercase tracking-wide font-medium">Receitas</p>
-                <p className="text-sm font-bold mt-1">{formatBRL(financeLive.incomeMonth)}</p>
-                <p className="text-[11px] text-emerald-600">+ {formatBRL(financeLive.incomeMonth - financeLive.expenseMonth)}</p>
-              </div>
-              <div className="rounded-xl bg-[var(--card-soft)] border border-[var(--border)] p-3 flex flex-col justify-between">
-                <p className="text-[11px] text-[var(--faint)] uppercase tracking-wide font-medium">Tendência</p>
-                <Sparkline data={demoFinance.sparkline} />
-              </div>
-            </div>
-          </div>
-        </Surface>
-
-        {/* Hoje */}
-        <div className="rounded-[20px] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-          <div className="px-5 sm:px-6 pt-5 pb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-tight">Hoje</h2>
-            <span className="text-xs rounded-full bg-[var(--card-soft)] border border-[var(--border)] px-2.5 py-1 text-[var(--muted-foreground)]">{todayEvents.length>0? todayEvents.length : (isDemo ? demoAgendaToday.length : 0)} itens</span>
-          </div>
-          <div className="px-2 sm:px-3 pb-3">
-            {todayEvents.length>0 ? (
-              <div className="divide-y divide-[var(--border)]">
-                {todayEvents.map(ev=> {
-                  const time = ev.all_day ? "Dia inteiro" : new Intl.DateTimeFormat("pt-BR", { hour:"2-digit", minute:"2-digit", timeZone:"America/Sao_Paulo"}).format(new Date(ev.starts_at));
-                  return <AgendaItem key={ev.id} time={time} title={ev.title} meta={ev.category} kind={ev.category==="school"?"school": ev.category==="finance"?"event": "event"} />;
-                })}
-              </div>
-            ) : isDemo ? (
-              <AgendaList>
-                {demoAgendaToday.map((a) => <AgendaItem key={a.id} time={a.time} title={a.title} meta={a.meta} kind={a.kind} />)}
-              </AgendaList>
+        <div className="flex items-center gap-2">
+          {editing && (
+            <Button variant="ghost" size="sm" className="rounded-full" onClick={reset}>
+              <RotateCcw className="h-3.5 w-3.5" /> Restaurar
+            </Button>
+          )}
+          <Button
+            variant={editing ? "default" : "muted"}
+            size="sm"
+            className="rounded-full"
+            onClick={() => setEditing(!editing)}
+          >
+            {editing ? (
+              <>
+                <Check className="h-3.5 w-3.5" /> Concluir
+              </>
             ) : (
-              <div className="p-4 text-center text-sm text-[var(--muted-foreground)]">Nenhum compromisso hoje.</div>
+              <>
+                <LayoutGrid className="h-3.5 w-3.5" /> Editar painel
+              </>
             )}
-          </div>
-          <div className="px-5 py-3 border-t border-[var(--border)] flex items-center justify-between">
-            <p className="text-xs text-[var(--muted-foreground)]">Próximos 7 dias limpos</p>
-            <a href="/calendario" className="text-xs font-medium text-[var(--accent)] hover:underline">Abrir calendário</a>
-          </div>
+          </Button>
         </div>
       </div>
 
-      {/* Contas - editorial, sem grid de cards iguais */}
-      <div className="space-y-3">
-        <SectionHeader title="Contas" subtitle="Saldos calculados pelas transações" action={<a href="/financas/contas" className="text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Gerenciar</a>} />
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-thin sm:grid sm:grid-cols-4 sm:overflow-visible">
-          {accounts.filter((a)=>a.is_active).slice(0,4).map((a) => (
-            <AccountTile key={a.id} name={a.name} balance={calcAccountBalance(a, transactions)} color={a.color || "#6B7280"} type={a.type} brand_domain={a.brand_domain} brand_key={a.brand_key} fallback={a.name.slice(0,2).toUpperCase()} />
-          ))}
+      {/* primeiro uso no modo demonstração */}
+      {isDemo && isEmpty && (
+        <div className="rounded-[18px] border border-dashed border-[var(--border-strong)] bg-[var(--card)] p-6 text-center">
+          <p className="text-[15px] font-semibold">Seu painel está vazio</p>
+          <p className="mt-1.5 text-[13px] text-[var(--muted-foreground)] max-w-[46ch] mx-auto">
+            Adicione seus próprios lançamentos, ou carregue um conjunto de exemplo para ver o RISE com dados. Nada é
+            criado automaticamente.
+          </p>
+          <Button size="sm" variant="soft" className="rounded-full mt-4" onClick={loadDemo} disabled={seeding}>
+            {seeding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {seeding ? "Carregando…" : "Carregar dados de demonstração"}
+          </Button>
         </div>
-      </div>
+      )}
 
-      <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-5">
-        {/* Escola */}
-        <div className="rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-5 sm:p-6">
-          <SectionHeader title="Escola" subtitle="3º ano · 2 pendentes" action={<a href="/escola" className="text-xs font-medium text-[var(--accent)]">Ver tudo</a>} />
-          <div className="mt-4 flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-            {isDemo ? demoSchool.map((t) => (
-              <div key={t.title} className="min-w-[200px] rounded-2xl bg-[var(--card-soft)] border border-[var(--border)] p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium leading-tight">{t.title}</p>
-                  <GraduationCap className="h-4 w-4 text-[var(--faint)]" />
-                </div>
-                <p className="text-xs text-[var(--muted-foreground)] mt-1">Entrega {t.due} · prioridade {t.priority}</p>
-                <div className="mt-3 h-1.5 rounded-full bg-[var(--muted)] overflow-hidden"><div className="h-full bg-[var(--accent)]" style={{ width: `${t.progress}%` }} /></div>
-              </div>
-            )) : <p className="text-sm text-[var(--muted-foreground)]">Nenhuma atividade pendente.</p>}
-          </div>
+      {editing ? (
+        <>
+          <p className="text-[12.5px] text-[var(--muted-foreground)]">
+            Arraste pela alça para reordenar. Toque em Visível para ocultar um bloco.
+          </p>
+          <Reorder.Group axis="y" values={visibleOrder} onReorder={setOrder} className="space-y-3">
+            {visibleOrder.map((id) => (
+              <EditableWidget
+                key={id}
+                id={id}
+                hidden={hidden.includes(id)}
+                span={spanOf(id)}
+                onToggleHidden={() => toggleHidden(id)}
+                onToggleSpan={() => toggleSpan(id)}
+              />
+            ))}
+          </Reorder.Group>
+        </>
+      ) : (
+        <div className="grid lg:grid-cols-2 gap-4 items-start">
+          {visibleOrder
+            .filter((id) => !hidden.includes(id))
+            .map((id) => (
+              <WidgetShell
+                key={id}
+                title={WIDGET_META[id].title}
+                action={actionFor(id)}
+                className={spanOf(id) === "wide" ? "lg:col-span-2" : ""}
+              >
+                {renderBody(id)}
+              </WidgetShell>
+            ))}
         </div>
-
-        {/* Dívidas + eventos */}
-        <div className="space-y-5">
-          <div className="rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-5">
-            <SectionHeader title="Dívidas" action={<a href="/financas/dividas" className="text-xs font-medium text-[var(--muted-foreground)]">Ver</a>} />
-            <div className="mt-3 divide-y divide-[var(--border)]">
-              {debtSummary.hasReal ? (
-                [...debtSummary.owed, ...debtSummary.recv].map((d) => (
-                  <div key={d.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                    <div>
-                      <p className="text-sm font-medium">{d.person} <span className="text-xs text-[var(--muted-foreground)]">{d.kind === "owed" ? "· você deve" : "· te devem"}</span></p>
-                      <p className="text-xs text-[var(--muted-foreground)]">{debtStatus(d, payments, installments)} · {debtRemaining(d, payments) > 0 ? `restante ${formatBRL(debtRemaining(d, payments))}` : "quitado"}</p>
-                    </div>
-                    <p className={`text-sm font-bold ${d.kind === "receivable" ? "text-emerald-600" : ""}`}>{formatBRL(d.amount)}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-[var(--muted-foreground)]">Nenhuma dívida — crie em Finanças → Dívidas.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-[20px] bg-[var(--card-soft)] border border-[var(--border)] p-5">
-            <SectionHeader title="Próximos eventos" />
-            <p className="text-sm text-[var(--muted-foreground)] mt-3">Nenhum evento nos próximos 7 dias.</p>
-            <a href="/calendario" className="inline-flex mt-3 text-xs font-medium text-[var(--accent)] hover:underline"><Wallet className="h-3.5 w-3.5 mr-1" /> Adicionar evento</a>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Item arrastável do modo de edição.
+   Mostra só o resumo do bloco — arrastar conteúdo pesado é ruim de usar
+   e caro de animar.                                                    */
+/* ------------------------------------------------------------------ */
+function EditableWidget({
+  id,
+  hidden,
+  span,
+  onToggleHidden,
+  onToggleSpan,
+}: {
+  id: WidgetId;
+  hidden: boolean;
+  span: "wide" | "narrow";
+  onToggleHidden: () => void;
+  onToggleSpan: () => void;
+}) {
+  const controls = useDragControls();
+  const meta = WIDGET_META[id];
+
+  return (
+    <Reorder.Item value={id} dragListener={false} dragControls={controls} className="list-none">
+      <WidgetShell title={meta.title} editing hidden={hidden} onToggleHidden={onToggleHidden} dragControls={controls}>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[12.5px] text-[var(--muted-foreground)]">{meta.desc}</p>
+          <button
+            type="button"
+            onClick={onToggleSpan}
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--card-soft)] px-2.5 py-1 text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          >
+            {span === "wide" ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            {span === "wide" ? "Largura total" : "Meia largura"}
+          </button>
+        </div>
+      </WidgetShell>
+    </Reorder.Item>
   );
 }

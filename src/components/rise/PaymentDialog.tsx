@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { debtPaymentSchema } from "@/lib/validators/debt";
 import { useFinanceStore } from "@/lib/store/financeStore";
+import { AccountPicker } from "@/components/rise/AccountPicker";
 import { useDebtStore } from "@/lib/store/debtStore";
 import { debtRemaining } from "@/lib/store/debtStore";
 import { formatBRL } from "@/lib/utils";
@@ -61,8 +62,8 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
     <AnimatePresence>
       {open && (
         <>
-          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={onClose} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
-          <motion.div initial={{ opacity:0, y:18, scale:0.98 }} animate={{ opacity:1, y:0, scale:1 }} exit={{ opacity:0, y:10, scale:0.98 }} className="fixed inset-x-0 bottom-0 lg:inset-auto lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 z-50 w-full lg:max-w-[440px] rounded-t-[20px] lg:rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-5 pb-[calc(1rem+var(--sab))] shadow-[0_24px_64px_rgba(0,0,0,0.24)]">
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={onClose} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
+          <motion.div initial={{ opacity:0, y:18, scale:0.98 }} animate={{ opacity:1, y:0, scale:1 }} exit={{ opacity:0, y:10, scale:0.98 }} className="fixed inset-x-0 bottom-0 lg:inset-auto lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 z-50 w-full lg:max-w-[440px] rounded-t-[22px] lg:rounded-[20px] border border-[var(--border)] bg-[var(--elevated)] p-5 pb-[calc(1rem+var(--sab))] shadow-[0_28px_70px_rgba(0,0,0,0.55)]">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm">Registrar pagamento — {debt.person}</h3>
               <button onClick={onClose} className="h-8 w-8 rounded-full bg-[var(--card-soft)] grid place-items-center"><X className="h-4 w-4" /></button>
@@ -72,7 +73,7 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
               <div>
                 <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Valor (R$)</label>
                 <Input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="100,00" inputMode="decimal" className="mt-1" />
-                {Number(amount.replace(",",".")) > (instRemaining ? instRemaining.remaining : remaining) +0.005 && <p className="text-xs text-red-600 mt-1">Valor maior que o restante</p>}
+                {Number(amount.replace(",",".")) > (instRemaining ? instRemaining.remaining : remaining) +0.005 && <p className="text-xs text-[var(--negative)] mt-1">Valor maior que o restante</p>}
               </div>
               {installments.length>0 && (
                 <div>
@@ -93,12 +94,8 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
               </label>
               {createTx && (
                 <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-[var(--card-soft)] border border-[var(--border)]">
-                  <div>
-                    <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Conta</label>
-                    <select value={account} onChange={e=>setAccount(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 text-sm">
-                      <option value="">Sem conta</option>
-                      {accounts.filter(a=>a.is_active).map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
+                  <div className="col-span-2">
+                    <AccountPicker accounts={accounts} value={account} onChange={setAccount} />
                   </div>
                   <div>
                     <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Categoria</label>
@@ -106,7 +103,7 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
                   </div>
                 </div>
               )}
-              {err && <p className="text-xs text-red-600">{err}</p>}
+              {err && <p className="text-xs text-[var(--negative)]">{err}</p>}
               <Button onClick={submit} disabled={loading} className="w-full rounded-full">{loading ? "Registrando..." : "Confirmar pagamento"}</Button>
             </div>
           </motion.div>

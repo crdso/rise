@@ -30,6 +30,7 @@ export default function ContasPage() {
       setEditing(null);
     } catch (e: unknown) {
       push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
+      throw e; // mantém o dialog aberto com os dados preenchidos
     }
   };
 
@@ -51,7 +52,7 @@ export default function ContasPage() {
             <div key={a.id} className={`rounded-[18px] border p-4 flex flex-col gap-3 ${!a.is_active ? "opacity-60 bg-[var(--card-soft)] border-dashed" : "bg-[var(--card)] border-[var(--border)]"}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  {(() => { const b = brandForAccount(a); return b?.domain ? <BrandLogo domain={b.domain} name={b.name} size={36} className="rounded-xl border border-[var(--border)] bg-white" /> : <div className="h-9 w-9 rounded-xl grid place-items-center text-white font-bold text-xs" style={{ background: a.color || "#6B7280" }}>{a.name.slice(0,2).toUpperCase()}</div>; })()}
+                  {(() => { const b = brandForAccount(a); const generic = !b.domain && (a.type === "cash" || a.type === "wallet"); return <BrandLogo domain={b.domain} name={b.domain ? b.name : a.name} color={b.color || a.color} size={36} generic={generic} />; })()}
                   <div>
                     <p className="text-sm font-semibold leading-none">{a.name}</p>
                     <p className="text-xs text-[var(--faint)]">{a.type}</p>
