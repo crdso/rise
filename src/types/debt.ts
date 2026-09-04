@@ -26,6 +26,7 @@ export type DebtPayment = {
   paid_at: string; // timestamptz
   notes?: string | null;
   transaction_id?: string | null;
+  installment_id?: string | null;
   created_at: string;
 };
 
@@ -36,6 +37,6 @@ export type DebtInstallment = {
   installment_number: number;
   amount: number;
   due_date: string; // date
-  status: "pending" | "paid" | "overdue";
+  status: "pending" | "partial" | "paid" | "overdue";
   created_at: string;
 };

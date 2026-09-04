@@ -75,11 +75,11 @@ export function debtStatus(debt: Debt, payments: DebtPayment[]): "pending"|"part
   const paid = debtPaidAmount(debt.id, payments);
   const remaining = debt.amount - paid;
   if (remaining <= 0.005) return "paid";
-  if (paid > 0) return "partial";
   if (debt.due_date) {
-    const today = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-    const due = new Date(debt.due_date + "T00:00:00");
-    if (due < new Date(today.toISOString().slice(0,10))) return "overdue";
+    const todayStr = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).toISOString().slice(0,10);
+    const dueStr = debt.due_date;
+    if (dueStr < todayStr && remaining > 0.005) return "overdue";
   }
+  if (paid > 0) return "partial";
   return "pending";
 }

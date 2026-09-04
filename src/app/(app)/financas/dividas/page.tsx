@@ -51,6 +51,11 @@ export default function DividasPage() {
     try{ await debtService.createDebt(data as never); push({ title:"Dívida criada"});} catch(e:unknown){ push({ title:"Erro", desc:e instanceof Error?e.message:"", variant:"error"});}
   };
 
+  const handleUpdate = async (data: Parameters<typeof debtService.updateDebt>[1]) => {
+    if(!editDebt) return;
+    try{ await debtService.updateDebt(editDebt, data as never); push({ title:"Dívida atualizada"});} catch(e:unknown){ push({ title:"Erro", desc:e instanceof Error?e.message:"", variant:"error"});}
+  };
+
   const handlePay = async (data:{ amount:number; notes?:string|null; create_transaction?:boolean; account_id?:string|null; transaction_category?:string|null; installment_id?:string|null})=>{
     if(!payDebt) return;
     try{ await debtService.addPayment(payDebt, data as never); push({ title:"Pagamento registrado", desc:formatBRL(data.amount)});} catch(e:unknown){ push({ title:"Erro", desc:e instanceof Error?e.message:"", variant:"error"});}
@@ -136,7 +141,7 @@ export default function DividasPage() {
         </div>
       )}
 
-      <DebtDialog open={open} onClose={()=>{ setOpen(false); setEditDebt(null);}} onSave={(data)=>{ if(editDebt){ /* edit not yet */ debtService.createDebt; } else handleCreate(data);}} initial={editDebt? debts.find(d=>d.id===editDebt)||null : null} />
+      <DebtDialog open={open} onClose={()=>{ setOpen(false); setEditDebt(null);}} onSave={(data)=>{ if(editDebt) handleUpdate(data as never); else handleCreate(data);}} initial={editDebt? debts.find(d=>d.id===editDebt)||null : null} />
 
       <PaymentDialog open={!!payDebt} onClose={()=>setPayDebt(null)} onPay={handlePay} debt={payDebt? debts.find(d=>d.id===payDebt)||null : null} installments={payDebt? installments.filter(i=>i.debt_id===payDebt):[]} />
 
@@ -157,8 +162,18 @@ export default function DividasPage() {
             {detailInst.length>0 && (
               <div className="mt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--faint)]">Parcelas</p>
-                <div className="mt-2 space-y-1">
-                  {detailInst.map(inst=> <div key={inst.id} className="flex justify-between text-xs border border-[var(--border)] rounded-xl px-3 py-2 bg-[var(--card-soft)]"><span>{inst.installment_number}/{detailInst.length} — {inst.due_date}</span><span>{formatBRL(Number(inst.amount))} · {inst.status}</span></div>)}
+                <div className="mt-2 space-y-2">
+                  {detailInst.map(inst=> {
+                    const paidInst = payments.filter(p=>p.installment_id===inst.id).reduce((s,p)=>s+Number(p.amount),0);
+                    const remaining = Number(inst.amount) - paidInst;
+                    const pct = Math.min(100, Math.round((paidInst/Number(inst.amount))*100));
+                    return (
+                      <div key={inst.id} className="border border-[var(--border)] rounded-xl px-3 py-2 bg-[var(--card-soft)]">
+                        <div className="flex justify-between text-xs"><span>{inst.installment_number}/{detailInst.length} — {inst.due_date}</span><span className="font-medium">{formatBRL(Number(inst.amount))} · {inst.status}</span></div>
+                        {paidInst>0 && <div className="mt-1.5"><div className="h-1 rounded-full bg-[var(--muted)] overflow-hidden"><div className="h-full bg-[var(--accent)]" style={{ width:`${pct}%`}} /></div><p className="text-[11px] text-[var(--muted-foreground)] mt-1">pago {formatBRL(paidInst)} · restante {formatBRL(remaining)}</p></div>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -6,10 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { debtPaymentSchema } from "@/lib/validators/debt";
 import { useFinanceStore } from "@/lib/store/financeStore";
+import { useDebtStore } from "@/lib/store/debtStore";
+import { debtRemaining } from "@/lib/store/debtStore";
+import { formatBRL } from "@/lib/utils";
 import type { Debt, DebtInstallment } from "@/types/debt";
 
 export function PaymentDialog({ open, onClose, onPay, debt, installments }: { open: boolean; onClose: () => void; onPay: (data: { amount: number; notes?: string | null; create_transaction?: boolean; account_id?: string | null; transaction_category?: string | null; installment_id?: string | null }) => void; debt: Debt | null; installments: DebtInstallment[] }) {
   const { accounts } = useFinanceStore();
+  const { payments } = useDebtStore();
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [createTx, setCreateTx] = useState(true);
@@ -18,9 +22,17 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
   const [inst, setInst] = useState("");
   const [err, setErr] = useState("");
 
+  const remaining = debt ? debtRemaining(debt, payments) : 0;
+  const instRemaining = (() => {
+    if (!inst) return null;
+    const i = installments.find(x=>x.id===inst);
+    if (!i) return null;
+    const paid = payments.filter(p=>p.installment_id===inst).reduce((s,p)=>s+p.amount,0);
+    return { inst: i, paid, remaining: i.amount - paid };
+  })();
+
   useEffect(() => {
     if (open && debt) {
-      const remaining = debt.amount; // parent will compute remaining, but keep simple
       setAmount(""); setNotes(""); setCreateTx(true); setAccount(accounts.find(a=>a.is_active)?.id || ""); setCategory(""); setInst(""); setErr("");
     }
   }, [open, debt, accounts]);
@@ -43,10 +55,12 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
               <h3 className="font-semibold text-sm">Registrar pagamento — {debt.person}</h3>
               <button onClick={onClose} className="h-8 w-8 rounded-full bg-[var(--card-soft)] grid place-items-center"><X className="h-4 w-4" /></button>
             </div>
+            <div className="mt-1.5 text-xs text-[var(--muted-foreground)]">Restante: {formatBRL(remaining)} {instRemaining ? `· Parcela ${instRemaining.inst.installment_number} restante ${formatBRL(instRemaining.remaining)} (pago ${formatBRL(instRemaining.paid)})` : ""}</div>
             <div className="mt-4 space-y-3">
               <div>
                 <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Valor (R$)</label>
                 <Input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="100,00" inputMode="decimal" className="mt-1" />
+                {Number(amount.replace(",",".")) > (instRemaining ? instRemaining.remaining : remaining) +0.005 && <p className="text-xs text-red-600 mt-1">Valor maior que o restante</p>}
               </div>
               {installments.length>0 && (
                 <div>

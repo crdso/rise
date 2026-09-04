@@ -31,6 +31,16 @@ export function DebtDialog({ open, onClose, onSave, initial }: { open: boolean; 
     }
   }, [open, initial]);
 
+  function addMonthsEOM(dateStr: string, months: number): string {
+    const [y,m,d]=dateStr.split("-").map(Number);
+    let tm=m+months;
+    let ty=y+Math.floor((tm-1)/12);
+    tm=((tm-1)%12)+1;
+    const last=new Date(ty, tm, 0).getDate();
+    const day=Math.min(d, last);
+    return `${ty}-${String(tm).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  }
+
   useEffect(() => {
     if (!isParc || !amount || !count || !firstDue) { setPreview(null); return; }
     const total = Number(amount.replace(",","."));
@@ -40,13 +50,21 @@ export function DebtDialog({ open, onClose, onSave, initial }: { open: boolean; 
     const rem = +(total - per*(n-1)).toFixed(2);
     const list = [];
     for(let i=1;i<=n;i++){
-      const d=new Date(firstDue); d.setMonth(d.getMonth()+i-1);
-      list.push({ n:i, amount: i===n?rem:per, due: d.toISOString().slice(0,10) });
+      const due=addMonthsEOM(firstDue, i-1);
+      list.push({ n:i, amount: i===n?rem:per, due });
     }
     setPreview(list);
   }, [isParc, amount, count, firstDue]);
 
   const submit = () => {
+    if (initial) {
+      // edição: apenas campos permitidos, sem parcelamento
+      const editParsed = debtSchema.pick({ person:true, description:true, kind:true, amount:true, due_date:true, notes:true }).safeParse({ person, description: desc||null, kind, amount: Number(amount.replace(",",".")), due_date: due||null, notes: notes||null });
+      if (!editParsed.success) { setErr(editParsed.error.issues[0]?.message||"Verifique"); return; }
+      onSave({ person: editParsed.data.person, description: editParsed.data.description||null, kind: editParsed.data.kind, amount: editParsed.data.amount, due_date: editParsed.data.due_date||null, notes: editParsed.data.notes||null } as never);
+      onClose();
+      return;
+    }
     const parsed = debtSchema.safeParse({ person, description: desc||null, kind, amount: Number(amount.replace(",",".")), due_date: isParc ? null : (due||null), notes: notes||null, is_installment: isParc, installments_count: isParc? Number(count): null, first_due_date: isParc? firstDue||null : null });
     if (!parsed.success) { setErr(parsed.error.issues[0]?.message||"Verifique"); return; }
     onSave({ person: parsed.data.person, description: parsed.data.description||null, kind: parsed.data.kind, amount: parsed.data.amount, due_date: isParc? null : (parsed.data.due_date||null), notes: parsed.data.notes||null, is_installment: parsed.data.is_installment, installments_count: parsed.data.installments_count||null, first_due_date: parsed.data.first_due_date||null });
@@ -89,19 +107,19 @@ export function DebtDialog({ open, onClose, onSave, initial }: { open: boolean; 
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={isParc} onChange={e=>setIsParc(e.target.checked)} className="h-4 w-4" /> Parcelado
+              <label className="flex items-center gap-2 text-sm opacity-100">
+                <input type="checkbox" checked={isParc} onChange={e=>setIsParc(e.target.checked)} disabled={!!initial} className="h-4 w-4 disabled:opacity-50" /> Parcelado {initial?.is_installment ? <span className="text-xs text-[var(--faint)]">(não alterável após criação)</span> : null}
               </label>
 
               {isParc && (
                 <div className="grid grid-cols-2 gap-3 rounded-xl bg-[var(--card-soft)] border border-[var(--border)] p-3">
                   <div>
                     <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Parcelas</label>
-                    <Input type="number" min={2} max={48} value={count} onChange={e=>setCount(e.target.value)} className="mt-1" />
+                    <Input type="number" min={2} max={48} value={count} onChange={e=>setCount(e.target.value)} className="mt-1" disabled={!!initial} />
                   </div>
                   <div>
                     <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Primeiro vencimento</label>
-                    <Input type="date" value={firstDue} onChange={e=>setFirstDue(e.target.value)} className="mt-1" />
+                    <Input type="date" value={firstDue} onChange={e=>setFirstDue(e.target.value)} className="mt-1" disabled={!!initial} />
                   </div>
                   {preview && (
                     <div className="col-span-2 mt-2 space-y-1 max-h-[120px] overflow-auto text-xs">
