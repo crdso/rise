@@ -1,8 +1,9 @@
 "use client";
 import { motion } from "framer-motion";
 import { ArrowUpRight, TrendingDown, Wallet, GraduationCap } from "lucide-react";
-import { formatBRL } from "@/lib/utils";
-import { headerDate, demoFinance, demoAccounts, demoAgendaToday, demoDebts, demoSchool } from "@/lib/fixtures";
+import { formatBRL, greeting } from "@/lib/utils";
+import { headerDate, demoFinance, demoAgendaToday, demoDebts, demoSchool } from "@/lib/fixtures";
+import { useFinanceStore, calcAccountBalance } from "@/lib/store/financeStore";
 import { SectionHeader, Surface } from "@/components/rise/Section";
 import { AccountTile } from "@/components/rise/AccountTile";
 import { AgendaItem, AgendaList } from "@/components/rise/Agenda";
@@ -27,11 +28,43 @@ function Sparkline({ data }: { data: number[] }) {
 
 export default function Dashboard() {
   const todayLabel = useMemo(() => headerDate(new Date()), []);
+  const greet = useMemo(() => greeting("Ezequias"), []);
+  const { accounts, transactions, categories } = useFinanceStore();
+  const financeLive = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    const monthTxs = transactions.filter((t) => {
+      const d = new Date(t.occurred_at);
+      return d.getMonth() === month && d.getFullYear() === year;
+    });
+    const exp = monthTxs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    const inc = monthTxs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+    let total = 0;
+    for (const a of accounts) if (a.is_active) total += calcAccountBalance(a, transactions);
+    // fallback to demo if no data yet
+    const hasData = transactions.length > 0;
+    return {
+      balance: hasData ? total : demoFinance.balance,
+      expenseMonth: hasData ? exp : demoFinance.expenseMonth,
+      incomeMonth: hasData ? inc : demoFinance.incomeMonth,
+      topCat: (() => {
+        if (!hasData) return demoFinance.topCategory;
+        const byCat: Record<string, number> = {};
+        monthTxs.filter((t) => t.type === "expense").forEach((t) => {
+          const name = categories.find((c) => c.id === t.category_id)?.name || "Outros";
+          byCat[name] = (byCat[name] || 0) + t.amount;
+        });
+        const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+        return top ? top[0] : "—";
+      })(),
+    };
+  }, [accounts, transactions, categories]);
   return (
     <div className="space-y-7">
       {/* Greeting */}
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-        <h1 className="text-[26px] sm:text-[30px] font-semibold tracking-tight leading-none">Boa tarde, Ezequias.</h1>
+        <h1 className="text-[26px] sm:text-[30px] font-semibold tracking-tight leading-none">{greet}</h1>
         <p className="text-sm text-[var(--muted-foreground)] mt-1.5 capitalize">{todayLabel} · tudo sob controle.</p>
       </motion.div>
 
@@ -44,7 +77,7 @@ export default function Dashboard() {
             <SectionHeader title="Financeiro" subtitle="Resumo do mês" action={<a href="/financas" className="text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] inline-flex items-center gap-1">Ver finanças <ArrowUpRight className="h-3.5 w-3.5" /></a>} />
             <div className="mt-5">
               <p className="text-[11px] tracking-[0.14em] uppercase font-medium text-[var(--faint)]">Saldo total</p>
-              <p className="text-[32px] sm:text-[36px] font-bold tracking-tight leading-none mt-1">{formatBRL(demoFinance.balance)}</p>
+              <p className="text-[32px] sm:text-[36px] font-bold tracking-tight leading-none mt-1">{formatBRL(financeLive.balance)}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300"><TrendingDown className="h-3 w-3" /> {demoFinance.deltaVsPrev}% vs mês anterior</span>
                 <span className="text-[var(--muted-foreground)]">Maior gasto em {demoFinance.biggestDay.date} · {formatBRL(demoFinance.biggestDay.amount)}</span>
@@ -54,13 +87,13 @@ export default function Dashboard() {
             <div className="mt-6 grid grid-cols-3 gap-3">
               <div className="rounded-xl bg-[var(--card-soft)] border border-[var(--border)] p-3">
                 <p className="text-[11px] text-[var(--faint)] uppercase tracking-wide font-medium">Gastos</p>
-                <p className="text-sm font-bold mt-1">{formatBRL(demoFinance.expenseMonth)}</p>
-                <p className="text-[11px] text-[var(--muted-foreground)]">{demoFinance.topCategory}</p>
+                <p className="text-sm font-bold mt-1">{formatBRL(financeLive.expenseMonth)}</p>
+                <p className="text-[11px] text-[var(--muted-foreground)]">{financeLive.topCat}</p>
               </div>
               <div className="rounded-xl bg-[var(--card-soft)] border border-[var(--border)] p-3">
                 <p className="text-[11px] text-[var(--faint)] uppercase tracking-wide font-medium">Receitas</p>
-                <p className="text-sm font-bold mt-1">{formatBRL(demoFinance.incomeMonth)}</p>
-                <p className="text-[11px] text-emerald-600">+ {formatBRL(demoFinance.incomeMonth - demoFinance.expenseMonth)}</p>
+                <p className="text-sm font-bold mt-1">{formatBRL(financeLive.incomeMonth)}</p>
+                <p className="text-[11px] text-emerald-600">+ {formatBRL(financeLive.incomeMonth - financeLive.expenseMonth)}</p>
               </div>
               <div className="rounded-xl bg-[var(--card-soft)] border border-[var(--border)] p-3 flex flex-col justify-between">
                 <p className="text-[11px] text-[var(--faint)] uppercase tracking-wide font-medium">Tendência</p>
@@ -90,9 +123,11 @@ export default function Dashboard() {
 
       {/* Contas - editorial, sem grid de cards iguais */}
       <div className="space-y-3">
-        <SectionHeader title="Contas" subtitle="Saldos calculados pelas transações" action={<a href="/financas" className="text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Gerenciar</a>} />
+        <SectionHeader title="Contas" subtitle="Saldos calculados pelas transações" action={<a href="/financas/contas" className="text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Gerenciar</a>} />
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-thin sm:grid sm:grid-cols-4 sm:overflow-visible">
-          {demoAccounts.map((a) => <AccountTile key={a.id} {...a} />)}
+          {accounts.filter((a)=>a.is_active).slice(0,4).map((a) => (
+            <AccountTile key={a.id} name={a.name} balance={calcAccountBalance(a, transactions)} color={a.color || "#6B7280"} type={a.type} logo={`/icons/banks/${a.icon || "generic"}.svg`} fallback={a.name.slice(0,2).toUpperCase()} />
+          ))}
         </div>
       </div>
 

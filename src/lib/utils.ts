@@ -33,7 +33,7 @@ export function formatDate(date: string | Date, opts?: { withTime?: boolean; all
 }
 
 export function greeting(name = "Ezequias") {
-  const h = new Date().getHours();
+  const h = Number(new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date()));
   if (h < 12) return `Bom dia, ${name}.`;
   if (h < 18) return `Boa tarde, ${name}.`;
   return `Boa noite, ${name}.`;

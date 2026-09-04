@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ToastProvider } from "@/components/ui/toast";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const space = Space_Grotesk({ subsets: ["latin"], variable: "--font-space", display: "swap" });
@@ -32,8 +33,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full antialiased overflow-x-hidden">
         <ThemeProvider>
-          <div className="rise-ambient" aria-hidden />
-          {children}
+          <ToastProvider>
+            <div className="rise-ambient" aria-hidden />
+            {children}
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>
