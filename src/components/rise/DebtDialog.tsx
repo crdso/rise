@@ -99,11 +99,12 @@ export function DebtDialog({ open, onClose, onSave, initial }: { open: boolean; 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Valor total (R$)</label>
-                  <Input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="500,00" inputMode="decimal" className="mt-1" />
+                  <Input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="500,00" inputMode="decimal" className="mt-1" disabled={!!initial?.is_installment} />
+                  {initial?.is_installment && <p className="text-[11px] text-[var(--faint)] mt-1">Valor imutável para parcelada</p>}
                 </div>
                 <div>
                   <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Vencimento</label>
-                  <Input type="date" value={due} onChange={e=>setDue(e.target.value)} className="mt-1" disabled={isParc} />
+                  <Input type="date" value={due} onChange={e=>setDue(e.target.value)} className="mt-1" disabled={isParc || !!initial?.is_installment} />
                 </div>
               </div>
 

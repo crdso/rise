@@ -71,6 +71,7 @@ export const debtService = {
       const prev=s.debts.find(d=>d.id===id);
       if(!prev) throw new Error("debt not found");
       if(prev.is_installment && ("is_installment" in patch || "installments_count" in patch)) throw new Error("parcelamento não pode ser alterado");
+      if(prev.is_installment && patch.amount !== undefined && patch.amount !== prev.amount) throw new Error("valor total de dívida parcelada não pode ser alterado");
       if(patch.amount !== undefined){
         const paid=debtPaidAmount(id, s.payments);
         if(patch.amount < paid -0.005) throw new Error(`valor não pode ser menor que o já pago (${paid})`);

@@ -5,8 +5,10 @@ import { useState } from "react";
 import { AIParserService } from "@/lib/ai/parser";
 import { TransactionDialog } from "@/components/rise/TransactionDialog";
 import { DebtDialog } from "@/components/rise/DebtDialog";
+import { EventDialog } from "@/components/rise/EventDialog";
 import { financeService } from "@/lib/services/finance";
 import { debtService } from "@/lib/services/debtService";
+import { calendarService } from "@/lib/services/calendarService";
 import { useToast } from "@/components/ui/toast";
 import { formatBRL } from "@/lib/utils";
 
@@ -15,6 +17,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
   const [parsed, setParsed] = useState<string | null>(null);
   const [txOpen, setTxOpen] = useState<null | "expense" | "income">(null);
   const [debtOpen, setDebtOpen] = useState(false);
+  const [eventOpen, setEventOpen] = useState(false);
   const { push } = useToast();
 
   const handleAI = async () => {
@@ -74,8 +77,12 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
                     <p className="mt-2 text-sm font-semibold">Dívida</p>
                     <p className="text-xs text-[var(--muted-foreground)]">Eu devo / Me devem</p>
                   </button>
+                  <button onClick={() => setEventOpen(true)} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left hover:border-[var(--border-strong)] hover:bg-[var(--card-soft)] transition-colors">
+                    <CalendarPlus className="h-5 w-5 text-[var(--accent)]" />
+                    <p className="mt-2 text-sm font-semibold">Evento</p>
+                    <p className="text-xs text-[var(--muted-foreground)]">Reunião, compromisso</p>
+                  </button>
                   {[
-                    { id: "event", label: "Evento", icon: CalendarPlus, desc: "Reunião, compromisso" },
                     { id: "reminder", label: "Lembrete", icon: Bell, desc: "Com horário/recorrente" },
                     { id: "school_task", label: "Atividade escolar", icon: GraduationCap, desc: "Prova, trabalho..." },
                   ].map((o) => (
@@ -119,6 +126,20 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
             await debtService.createDebt(data as never);
             push({ title: "Dívida criada", desc: data.person });
             setDebtOpen(false);
+            onClose();
+          } catch (e: unknown) {
+            push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
+          }
+        }}
+      />
+      <EventDialog
+        open={eventOpen}
+        onClose={() => setEventOpen(false)}
+        onSave={async (data) => {
+          try {
+            await calendarService.create(data as never);
+            push({ title: "Evento criado", desc: data.title });
+            setEventOpen(false);
             onClose();
           } catch (e: unknown) {
             push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });

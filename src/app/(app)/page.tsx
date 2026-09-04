@@ -5,6 +5,8 @@ import { formatBRL, greeting } from "@/lib/utils";
 import { headerDate, demoFinance, demoAgendaToday, demoSchool } from "@/lib/fixtures";
 import { useFinanceStore, calcAccountBalance } from "@/lib/store/financeStore";
 import { useDebtStore, debtRemaining, debtStatus } from "@/lib/store/debtStore";
+import { useCalendarStore } from "@/lib/store/calendarStore";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { SectionHeader, Surface } from "@/components/rise/Section";
 import { AccountTile } from "@/components/rise/AccountTile";
 import { AgendaItem, AgendaList } from "@/components/rise/Agenda";
@@ -31,12 +33,24 @@ export default function Dashboard() {
   const todayLabel = useMemo(() => headerDate(new Date()), []);
   const greet = useMemo(() => greeting("Ezequias"), []);
   const { accounts, transactions, categories } = useFinanceStore();
-  const { debts, payments } = useDebtStore();
+  const { debts, payments, installments } = useDebtStore();
+  const { events } = useCalendarStore();
   const debtSummary = useMemo(() => {
     const owed = debts.filter((d) => d.kind === "owed" && !d.archived_at).slice(0,2);
     const recv = debts.filter((d) => d.kind === "receivable" && !d.archived_at).slice(0,1);
     return { owed, recv, hasReal: debts.length > 0 };
   }, [debts]);
+  const todayEvents = useMemo(() => {
+    const todayStr = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).toISOString().slice(0,10);
+    const todays = events.filter(e => {
+      const ds = new Date(e.starts_at).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+      // en-CA gives YYYY-MM-DD
+      const evDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date(e.starts_at));
+      return evDate === todayStr;
+    }).slice(0,4);
+    return todays;
+  }, [events]);
+  const isDemo = !isSupabaseConfigured();
   const financeLive = useMemo(() => {
     const now = new Date();
     const month = now.getMonth();
@@ -49,14 +63,15 @@ export default function Dashboard() {
     const inc = monthTxs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
     let total = 0;
     for (const a of accounts) if (a.is_active) total += calcAccountBalance(a, transactions);
-    // fallback to demo if no data yet
     const hasData = transactions.length > 0;
+    const useDemo = isDemo && !hasData;
     return {
-      balance: hasData ? total : demoFinance.balance,
-      expenseMonth: hasData ? exp : demoFinance.expenseMonth,
-      incomeMonth: hasData ? inc : demoFinance.incomeMonth,
+      balance: useDemo ? demoFinance.balance : total,
+      expenseMonth: useDemo ? demoFinance.expenseMonth : exp,
+      incomeMonth: useDemo ? demoFinance.incomeMonth : inc,
       topCat: (() => {
-        if (!hasData) return demoFinance.topCategory;
+        if (useDemo) return demoFinance.topCategory;
+        if (!hasData) return "—";
         const byCat: Record<string, number> = {};
         monthTxs.filter((t) => t.type === "expense").forEach((t) => {
           const name = categories.find((c) => c.id === t.category_id)?.name || "Outros";
@@ -86,8 +101,14 @@ export default function Dashboard() {
               <p className="text-[11px] tracking-[0.14em] uppercase font-medium text-[var(--faint)]">Saldo total</p>
               <p className="text-[32px] sm:text-[36px] font-bold tracking-tight leading-none mt-1">{formatBRL(financeLive.balance)}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300"><TrendingDown className="h-3 w-3" /> {demoFinance.deltaVsPrev}% vs mês anterior</span>
-                <span className="text-[var(--muted-foreground)]">Maior gasto em {demoFinance.biggestDay.date} · {formatBRL(demoFinance.biggestDay.amount)}</span>
+                {isDemo && transactions.length===0 ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300"><TrendingDown className="h-3 w-3" /> {demoFinance.deltaVsPrev}% vs mês anterior</span>
+                    <span className="text-[var(--muted-foreground)]">Maior gasto em {demoFinance.biggestDay.date} · {formatBRL(demoFinance.biggestDay.amount)}</span>
+                  </>
+                ) : (
+                  <span className="text-[var(--muted-foreground)]">{transactions.length===0 ? "Sem dados ainda" : `${financeLive.expenseMonth>0 ? "Maior gasto" : "Nenhum gasto"} · ${financeLive.topCat}`}</span>
+                )}
               </div>
             </div>
 
@@ -114,12 +135,23 @@ export default function Dashboard() {
         <div className="rounded-[20px] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
           <div className="px-5 sm:px-6 pt-5 pb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">Hoje</h2>
-            <span className="text-xs rounded-full bg-[var(--card-soft)] border border-[var(--border)] px-2.5 py-1 text-[var(--muted-foreground)]">{demoAgendaToday.length} itens</span>
+            <span className="text-xs rounded-full bg-[var(--card-soft)] border border-[var(--border)] px-2.5 py-1 text-[var(--muted-foreground)]">{todayEvents.length>0? todayEvents.length : (isDemo ? demoAgendaToday.length : 0)} itens</span>
           </div>
           <div className="px-2 sm:px-3 pb-3">
-            <AgendaList>
-              {demoAgendaToday.map((a) => <AgendaItem key={a.id} time={a.time} title={a.title} meta={a.meta} kind={a.kind} />)}
-            </AgendaList>
+            {todayEvents.length>0 ? (
+              <div className="divide-y divide-[var(--border)]">
+                {todayEvents.map(ev=> {
+                  const time = ev.all_day ? "Dia inteiro" : new Intl.DateTimeFormat("pt-BR", { hour:"2-digit", minute:"2-digit", timeZone:"America/Sao_Paulo"}).format(new Date(ev.starts_at));
+                  return <AgendaItem key={ev.id} time={time} title={ev.title} meta={ev.category} kind={ev.category==="school"?"school": ev.category==="finance"?"event": "event"} />;
+                })}
+              </div>
+            ) : isDemo ? (
+              <AgendaList>
+                {demoAgendaToday.map((a) => <AgendaItem key={a.id} time={a.time} title={a.title} meta={a.meta} kind={a.kind} />)}
+              </AgendaList>
+            ) : (
+              <div className="p-4 text-center text-sm text-[var(--muted-foreground)]">Nenhum compromisso hoje.</div>
+            )}
           </div>
           <div className="px-5 py-3 border-t border-[var(--border)] flex items-center justify-between">
             <p className="text-xs text-[var(--muted-foreground)]">Próximos 7 dias limpos</p>
@@ -143,7 +175,7 @@ export default function Dashboard() {
         <div className="rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-5 sm:p-6">
           <SectionHeader title="Escola" subtitle="3º ano · 2 pendentes" action={<a href="/escola" className="text-xs font-medium text-[var(--accent)]">Ver tudo</a>} />
           <div className="mt-4 flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-            {demoSchool.map((t) => (
+            {isDemo ? demoSchool.map((t) => (
               <div key={t.title} className="min-w-[200px] rounded-2xl bg-[var(--card-soft)] border border-[var(--border)] p-4">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-medium leading-tight">{t.title}</p>
@@ -152,7 +184,7 @@ export default function Dashboard() {
                 <p className="text-xs text-[var(--muted-foreground)] mt-1">Entrega {t.due} · prioridade {t.priority}</p>
                 <div className="mt-3 h-1.5 rounded-full bg-[var(--muted)] overflow-hidden"><div className="h-full bg-[var(--accent)]" style={{ width: `${t.progress}%` }} /></div>
               </div>
-            ))}
+            )) : <p className="text-sm text-[var(--muted-foreground)]">Nenhuma atividade pendente.</p>}
           </div>
         </div>
 
@@ -166,7 +198,7 @@ export default function Dashboard() {
                   <div key={d.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
                     <div>
                       <p className="text-sm font-medium">{d.person} <span className="text-xs text-[var(--muted-foreground)]">{d.kind === "owed" ? "· você deve" : "· te devem"}</span></p>
-                      <p className="text-xs text-[var(--muted-foreground)]">{debtStatus(d, payments)} · {debtRemaining(d, payments) > 0 ? `restante ${formatBRL(debtRemaining(d, payments))}` : "quitado"}</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">{debtStatus(d, payments, installments)} · {debtRemaining(d, payments) > 0 ? `restante ${formatBRL(debtRemaining(d, payments))}` : "quitado"}</p>
                     </div>
                     <p className={`text-sm font-bold ${d.kind === "receivable" ? "text-emerald-600" : ""}`}>{formatBRL(d.amount)}</p>
                   </div>

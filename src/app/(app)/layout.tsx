@@ -9,8 +9,10 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
 import { useFinanceStore } from "@/lib/store/financeStore";
 import { useDebtStore } from "@/lib/store/debtStore";
+import { useCalendarStore } from "@/lib/store/calendarStore";
 import { financeService } from "@/lib/services/finance";
 import { debtService } from "@/lib/services/debtService";
+import { calendarService } from "@/lib/services/calendarService";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [quick, setQuick] = useState(false);
@@ -56,15 +58,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       try {
         useFinanceStore.getState().clearForSupabase();
         useDebtStore.getState().clearForSupabase();
-        await Promise.all([financeService.refreshFromServer(), debtService.refreshFromServer()]);
+        useCalendarStore.getState().clearForSupabase();
+        await Promise.all([financeService.refreshFromServer(), debtService.refreshFromServer(), calendarService.refreshFromServer()]);
       } catch (e) {
-        console.error("finance/debt sync failed", e);
+        console.error("finance/debt/calendar sync failed", e);
       }
       if (!cancelled) setReady(true);
       const { data: sub } = supabase.auth.onAuthStateChange((event) => {
         if (event === "SIGNED_OUT") {
           useFinanceStore.getState().clearForSupabase();
           useDebtStore.getState().clearForSupabase();
+          useCalendarStore.getState().clearForSupabase();
         }
       });
       subscription = sub.subscription;

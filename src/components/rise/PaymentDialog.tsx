@@ -11,7 +11,7 @@ import { debtRemaining } from "@/lib/store/debtStore";
 import { formatBRL } from "@/lib/utils";
 import type { Debt, DebtInstallment } from "@/types/debt";
 
-export function PaymentDialog({ open, onClose, onPay, debt, installments }: { open: boolean; onClose: () => void; onPay: (data: { amount: number; notes?: string | null; create_transaction?: boolean; account_id?: string | null; transaction_category?: string | null; installment_id?: string | null }) => void; debt: Debt | null; installments: DebtInstallment[] }) {
+export function PaymentDialog({ open, onClose, onPay, debt, installments }: { open: boolean; onClose: () => void; onPay: (data: { amount: number; notes?: string | null; create_transaction?: boolean; account_id?: string | null; transaction_category?: string | null; installment_id?: string | null }) => Promise<void>; debt: Debt | null; installments: DebtInstallment[] }) {
   const { accounts } = useFinanceStore();
   const { payments } = useDebtStore();
   const [amount, setAmount] = useState("");
@@ -21,6 +21,7 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
   const [category, setCategory] = useState("");
   const [inst, setInst] = useState("");
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const remaining = debt ? debtRemaining(debt, payments) : 0;
   const instRemaining = (() => {
@@ -33,15 +34,26 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
 
   useEffect(() => {
     if (open && debt) {
-      setAmount(""); setNotes(""); setCreateTx(true); setAccount(accounts.find(a=>a.is_active)?.id || ""); setCategory(""); setInst(""); setErr("");
+      setAmount(""); setNotes(""); setCreateTx(true); setAccount(accounts.find(a=>a.is_active)?.id || ""); setCategory(""); setInst(""); setErr(""); setLoading(false);
     }
   }, [open, debt, accounts]);
 
-  const submit = () => {
-    const parsed = debtPaymentSchema.safeParse({ amount: Number(amount.replace(",",".")), notes: notes||null, create_transaction: createTx, account_id: account||null, transaction_category: category||null, installment_id: inst||null });
+  const submit = async () => {
+    const val = Number(amount.replace(",","."));
+    const limit = instRemaining ? instRemaining.remaining : remaining;
+    if (val > limit + 0.005) { setErr(`Valor maior que o restante (${formatBRL(limit)})`); return; }
+    const parsed = debtPaymentSchema.safeParse({ amount: val, notes: notes||null, create_transaction: createTx, account_id: account||null, transaction_category: category||null, installment_id: inst||null });
     if (!parsed.success) { setErr(parsed.error.issues[0]?.message||"Verifique"); return; }
-    onPay({ amount: parsed.data.amount, notes: parsed.data.notes||null, create_transaction: !!parsed.data.create_transaction, account_id: parsed.data.account_id||null, transaction_category: parsed.data.transaction_category||null, installment_id: parsed.data.installment_id||null });
-    onClose();
+    setLoading(true);
+    setErr("");
+    try {
+      await onPay({ amount: parsed.data.amount, notes: parsed.data.notes||null, create_transaction: !!parsed.data.create_transaction, account_id: parsed.data.account_id||null, transaction_category: parsed.data.transaction_category||null, installment_id: parsed.data.installment_id||null });
+      onClose();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Falha ao registrar pagamento");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!debt) return null;
@@ -95,7 +107,7 @@ export function PaymentDialog({ open, onClose, onPay, debt, installments }: { op
                 </div>
               )}
               {err && <p className="text-xs text-red-600">{err}</p>}
-              <Button onClick={submit} className="w-full rounded-full">Confirmar pagamento</Button>
+              <Button onClick={submit} disabled={loading} className="w-full rounded-full">{loading ? "Registrando..." : "Confirmar pagamento"}</Button>
             </div>
           </motion.div>
         </>

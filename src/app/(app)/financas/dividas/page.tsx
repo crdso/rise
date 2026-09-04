@@ -26,22 +26,22 @@ export default function DividasPage() {
     let list=[...debts].filter(d=>!d.archived_at);
     if(filter==="owed") list=list.filter(d=>d.kind==="owed");
     if(filter==="receivable") list=list.filter(d=>d.kind==="receivable");
-    if(filter==="pending") list=list.filter(d=> debtStatus(d,payments)==="pending");
-    if(filter==="overdue") list=list.filter(d=> debtStatus(d,payments)==="overdue");
-    if(filter==="paid") list=list.filter(d=> debtStatus(d,payments)==="paid" || debtRemaining(d,payments)<=0.01);
+    if(filter==="pending") list=list.filter(d=> debtStatus(d,payments,installments)==="pending");
+    if(filter==="overdue") list=list.filter(d=> debtStatus(d,payments,installments)==="overdue");
+    if(filter==="paid") list=list.filter(d=> debtStatus(d,payments,installments)==="paid" || debtRemaining(d,payments)<=0.01);
     if(q.trim()){
       const qq=q.toLowerCase();
       list=list.filter(d=> d.person.toLowerCase().includes(qq) || (d.description||"").toLowerCase().includes(qq));
     }
     return list;
-  }, [debts, payments, q, filter]);
+  }, [debts, payments, installments, q, filter]);
 
   const totals = useMemo(()=>{
     const owed = debts.filter(d=>d.kind==="owed" && !d.archived_at).reduce((s,d)=> s+ debtRemaining(d,payments),0);
     const recv = debts.filter(d=>d.kind==="receivable" && !d.archived_at).reduce((s,d)=> s+ debtRemaining(d,payments),0);
-    const overdue = debts.filter(d=> debtStatus(d,payments)==="overdue" && !d.archived_at).length;
+    const overdue = debts.filter(d=> debtStatus(d,payments,installments)==="overdue" && !d.archived_at).length;
     return { owed, recv, overdue };
-  }, [debts, payments]);
+  }, [debts, payments, installments]);
 
   const detailDebt = detail ? debts.find(d=>d.id===detail) : null;
   const detailPayments = detail ? payments.filter(p=>p.debt_id===detail).sort((a,b)=>+new Date(b.paid_at)-+new Date(a.paid_at)) : [];
@@ -110,7 +110,7 @@ export default function DividasPage() {
           {visible.map((d)=>{
             const paid=debtPaidAmount(d.id, payments);
             const remaining=debtRemaining(d,payments);
-            const status=debtStatus(d,payments);
+            const status=debtStatus(d,payments,installments);
             const pct=Math.min(100, Math.round((paid/d.amount)*100));
             return (
               <div key={d.id} onClick={()=>setDetail(d.id)} className="rounded-[18px] border border-[var(--border)] bg-[var(--card)] p-4 hover:border-[var(--border-strong)] cursor-pointer transition-colors">
