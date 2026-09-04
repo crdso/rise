@@ -5,6 +5,8 @@ export const accountSchema = z.object({
   type: z.enum(["checking", "wallet", "cash", "card", "savings", "other"]),
   icon: z.string().max(40).optional().nullable(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Cor hex #RRGGBB").optional().nullable().or(z.literal("")),
+  brand_domain: z.string().max(120).optional().nullable(),
+  brand_key: z.string().max(40).optional().nullable(),
   initial_balance: z.coerce.number().min(-999999999).max(999999999),
   is_active: z.boolean().optional().default(true),
 });

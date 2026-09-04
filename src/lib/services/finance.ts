@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { useFinanceStore } from "@/lib/store/financeStore";
 import type { Account, Category, Transaction } from "@/types/finance";
+import { FINANCIAL_BRANDS } from "@/lib/brands/registry";
 
 function uid() { return crypto.randomUUID(); }
 
@@ -11,10 +12,19 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return j.data as T;
 }
 
+function inferBrand(name: string): { brand_domain: string | null; brand_key: string | null } {
+  const norm = name.toLowerCase().trim();
+  for (const [k, v] of Object.entries(FINANCIAL_BRANDS)) {
+    if (norm.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(norm)) return { brand_domain: v.domain, brand_key: k };
+  }
+  return { brand_domain: null, brand_key: null };
+}
+
 // Demo helpers (local store)
 function demoCreateAccount(data: Omit<Account, "id" | "created_at" | "updated_at">): Account {
   const now = new Date().toISOString();
-  const acc: Account = { id: uid(), created_at: now, updated_at: now, ...data };
+  const inferred = !data.brand_domain && !data.brand_key ? inferBrand(data.name) : { brand_domain: data.brand_domain || null, brand_key: data.brand_key || null };
+  const acc: Account = { id: uid(), created_at: now, updated_at: now, ...data, brand_domain: inferred.brand_domain, brand_key: inferred.brand_key };
   useFinanceStore.getState().upsertAccount(acc);
   useFinanceStore.getState().pushAudit({ id: uid(), actor: "Você", action: "criou uma conta", entity: "account", entity_id: acc.id, after: acc, origin: "web", created_at: now });
   return acc;
@@ -35,8 +45,14 @@ export const financeService = {
     return useFinanceStore.getState().accounts;
   },
   async createAccount(data: Omit<Account, "id" | "created_at" | "updated_at">): Promise<Account> {
-    if (!isSupabaseConfigured()) return demoCreateAccount(data);
-    const created = await api<Account>("/api/accounts", { method: "POST", body: JSON.stringify(data) });
+    const enriched = { ...data } as Omit<Account, "id" | "created_at" | "updated_at">;
+    if (!enriched.brand_domain && !enriched.brand_key) {
+      const inf = inferBrand(enriched.name);
+      enriched.brand_domain = inf.brand_domain;
+      enriched.brand_key = inf.brand_key;
+    }
+    if (!isSupabaseConfigured()) return demoCreateAccount(enriched);
+    const created = await api<Account>("/api/accounts", { method: "POST", body: JSON.stringify(enriched) });
     useFinanceStore.getState().upsertAccount(created);
     return created;
   },
@@ -114,15 +130,17 @@ export const financeService = {
   },
   async refreshFromServer() {
     if (!isSupabaseConfigured()) return;
-    try {
-      const [accRes, txRes, catRes] = await Promise.all([
-        fetch("/api/accounts").then((r) => r.json()),
-        fetch("/api/transactions").then((r) => r.json()),
-        fetch("/api/categories").then((r) => r.json()).catch(() => ({ data: [] })),
-      ]);
-      if (accRes.data) accRes.data.forEach((a: Account) => useFinanceStore.getState().upsertAccount(a));
-      if (txRes.data) txRes.data.forEach((t: Transaction) => useFinanceStore.getState().upsertTransaction(t));
-      if (catRes.data) catRes.data.forEach((c: Category) => useFinanceStore.getState().upsertCategory(c));
-    } catch {}
+    const [accR, txR, catR] = await Promise.all([fetch("/api/accounts"), fetch("/api/transactions"), fetch("/api/categories")]);
+    if (!accR.ok) throw new Error(`Accounts sync failed: ${accR.status}`);
+    if (!txR.ok) throw new Error(`Transactions sync failed: ${txR.status}`);
+    if (!catR.ok) throw new Error(`Categories sync failed: ${catR.status}`);
+    const [accRes, txRes, catRes] = await Promise.all([accR.json(), txR.json(), catR.json()]);
+    if (accRes.error) throw new Error(accRes.error);
+    if (txRes.error) throw new Error(txRes.error);
+    // substituir snapshot inteiro para remover stale
+    const { setAccounts, setTransactions, setCategories } = useFinanceStore.getState();
+    if (Array.isArray(accRes.data)) setAccounts(accRes.data);
+    if (Array.isArray(txRes.data)) setTransactions(txRes.data);
+    if (Array.isArray(catRes.data)) setCategories(catRes.data);
   },
 };

@@ -2,8 +2,9 @@
 import { motion } from "framer-motion";
 import { ArrowUpRight, TrendingDown, Wallet, GraduationCap } from "lucide-react";
 import { formatBRL, greeting } from "@/lib/utils";
-import { headerDate, demoFinance, demoAgendaToday, demoDebts, demoSchool } from "@/lib/fixtures";
+import { headerDate, demoFinance, demoAgendaToday, demoSchool } from "@/lib/fixtures";
 import { useFinanceStore, calcAccountBalance } from "@/lib/store/financeStore";
+import { useDebtStore, debtRemaining, debtStatus } from "@/lib/store/debtStore";
 import { SectionHeader, Surface } from "@/components/rise/Section";
 import { AccountTile } from "@/components/rise/AccountTile";
 import { AgendaItem, AgendaList } from "@/components/rise/Agenda";
@@ -30,6 +31,12 @@ export default function Dashboard() {
   const todayLabel = useMemo(() => headerDate(new Date()), []);
   const greet = useMemo(() => greeting("Ezequias"), []);
   const { accounts, transactions, categories } = useFinanceStore();
+  const { debts, payments } = useDebtStore();
+  const debtSummary = useMemo(() => {
+    const owed = debts.filter((d) => d.kind === "owed" && !d.archived_at).slice(0,2);
+    const recv = debts.filter((d) => d.kind === "receivable" && !d.archived_at).slice(0,1);
+    return { owed, recv, hasReal: debts.length > 0 };
+  }, [debts]);
   const financeLive = useMemo(() => {
     const now = new Date();
     const month = now.getMonth();
@@ -126,7 +133,7 @@ export default function Dashboard() {
         <SectionHeader title="Contas" subtitle="Saldos calculados pelas transações" action={<a href="/financas/contas" className="text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Gerenciar</a>} />
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-thin sm:grid sm:grid-cols-4 sm:overflow-visible">
           {accounts.filter((a)=>a.is_active).slice(0,4).map((a) => (
-            <AccountTile key={a.id} name={a.name} balance={calcAccountBalance(a, transactions)} color={a.color || "#6B7280"} type={a.type} logo={`/icons/banks/${a.icon || "generic"}.svg`} fallback={a.name.slice(0,2).toUpperCase()} />
+            <AccountTile key={a.id} name={a.name} balance={calcAccountBalance(a, transactions)} color={a.color || "#6B7280"} type={a.type} brand_domain={a.brand_domain} brand_key={a.brand_key} fallback={a.name.slice(0,2).toUpperCase()} />
           ))}
         </div>
       </div>
@@ -152,17 +159,21 @@ export default function Dashboard() {
         {/* Dívidas + eventos */}
         <div className="space-y-5">
           <div className="rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-5">
-            <SectionHeader title="Dívidas" action={<a href="/financas" className="text-xs font-medium text-[var(--muted-foreground)]">Ver</a>} />
+            <SectionHeader title="Dívidas" action={<a href="/financas/dividas" className="text-xs font-medium text-[var(--muted-foreground)]">Ver</a>} />
             <div className="mt-3 divide-y divide-[var(--border)]">
-              {demoDebts.map((d) => (
-                <div key={d.person} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                  <div>
-                    <p className="text-sm font-medium">{d.person} <span className="text-xs text-[var(--muted-foreground)]">{d.kind === "owed" ? "· você deve" : "· te devem"}</span></p>
-                    <p className="text-xs text-[var(--muted-foreground)]">{d.kind === "owed" ? `vence ${d.due}` : d.note}</p>
+              {debtSummary.hasReal ? (
+                [...debtSummary.owed, ...debtSummary.recv].map((d) => (
+                  <div key={d.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                    <div>
+                      <p className="text-sm font-medium">{d.person} <span className="text-xs text-[var(--muted-foreground)]">{d.kind === "owed" ? "· você deve" : "· te devem"}</span></p>
+                      <p className="text-xs text-[var(--muted-foreground)]">{debtStatus(d, payments)} · {debtRemaining(d, payments) > 0 ? `restante ${formatBRL(debtRemaining(d, payments))}` : "quitado"}</p>
+                    </div>
+                    <p className={`text-sm font-bold ${d.kind === "receivable" ? "text-emerald-600" : ""}`}>{formatBRL(d.amount)}</p>
                   </div>
-                  <p className={`text-sm font-bold ${d.kind === "receivable" ? "text-emerald-600" : ""}`}>{formatBRL(d.amount)}</p>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-xs text-[var(--muted-foreground)]">Nenhuma dívida — crie em Finanças → Dívidas.</p>
+              )}
             </div>
           </div>
 

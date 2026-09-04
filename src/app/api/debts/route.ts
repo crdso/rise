@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { accountSchema } from "@/lib/validators/finance";
+import { debtSchema } from "@/lib/validators/debt";
 
 export async function GET() {
   if (!isSupabaseConfigured()) return NextResponse.json({ demo: true, data: [] });
@@ -9,7 +9,7 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { data, error } = await supabase.from("accounts").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("debts").select("*").eq("user_id", user.id).is("archived_at", null).order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }
@@ -21,24 +21,20 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const json = await req.json();
-  const parsed = accountSchema.safeParse(json);
+  const parsed = debtSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-
-  // RPC atômico: cria conta + audit em transação única (auth.uid() dentro da função)
-  const { data, error } = await supabase.rpc("create_account_with_audit", {
-    p_name: parsed.data.name,
-    p_type: parsed.data.type,
-    p_icon: parsed.data.icon || null,
-    p_color: parsed.data.color || null,
-    p_initial_balance: parsed.data.initial_balance,
-    p_brand_domain: parsed.data.brand_domain || null,
-    p_brand_key: parsed.data.brand_key || null,
+  const d = parsed.data;
+  const { data, error } = await supabase.rpc("create_debt_with_audit", {
+    p_person: d.person,
+    p_description: d.description || null,
+    p_kind: d.kind,
+    p_amount: d.amount,
+    p_due_date: d.due_date && d.due_date !== "" ? d.due_date : null,
+    p_notes: d.notes || null,
+    p_is_installment: d.is_installment || false,
+    p_installments_count: d.installments_count || null,
+    p_first_due_date: d.first_due_date || null,
   });
-
-  if (error) {
-    // inclui caso service role ausente configurado na função
-    const msg = error.message.includes("service_role") || error.message.includes("SUPABASE") ? "Erro de configuração: SUPABASE_SERVICE_ROLE_KEY ausente" : error.message;
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }

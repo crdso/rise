@@ -1,0 +1,127 @@
+"use client";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { debtSchema } from "@/lib/validators/debt";
+import type { Debt } from "@/types/debt";
+
+export function DebtDialog({ open, onClose, onSave, initial }: { open: boolean; onClose: () => void; onSave: (data: { person: string; description?: string | null; kind: "owed" | "receivable"; amount: number; due_date?: string | null; notes?: string | null; is_installment?: boolean; installments_count?: number | null; first_due_date?: string | null }) => void; initial?: Debt | null }) {
+  const [person, setPerson] = useState("");
+  const [desc, setDesc] = useState("");
+  const [kind, setKind] = useState<"owed" | "receivable">("owed");
+  const [amount, setAmount] = useState("");
+  const [due, setDue] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isParc, setIsParc] = useState(false);
+  const [count, setCount] = useState("4");
+  const [firstDue, setFirstDue] = useState("");
+  const [err, setErr] = useState("");
+  const [preview, setPreview] = useState<{n:number; amount:number; due:string}[] | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      if (initial) {
+        setPerson(initial.person); setDesc(initial.description||""); setKind(initial.kind); setAmount(String(initial.amount).replace(".",",")); setDue(initial.due_date||""); setNotes(initial.notes||""); setIsParc(!!initial.is_installment); setCount(String(initial.installments_count||4)); setFirstDue(initial.due_date||"");
+      } else {
+        setPerson(""); setDesc(""); setKind("owed"); setAmount(""); setDue(""); setNotes(""); setIsParc(false); setCount("4"); setFirstDue("");
+      }
+      setErr(""); setPreview(null);
+    }
+  }, [open, initial]);
+
+  useEffect(() => {
+    if (!isParc || !amount || !count || !firstDue) { setPreview(null); return; }
+    const total = Number(amount.replace(",","."));
+    const n = Number(count);
+    if (!total || !n || n<2) return;
+    const per = Math.floor(total/n*100)/100;
+    const rem = +(total - per*(n-1)).toFixed(2);
+    const list = [];
+    for(let i=1;i<=n;i++){
+      const d=new Date(firstDue); d.setMonth(d.getMonth()+i-1);
+      list.push({ n:i, amount: i===n?rem:per, due: d.toISOString().slice(0,10) });
+    }
+    setPreview(list);
+  }, [isParc, amount, count, firstDue]);
+
+  const submit = () => {
+    const parsed = debtSchema.safeParse({ person, description: desc||null, kind, amount: Number(amount.replace(",",".")), due_date: isParc ? null : (due||null), notes: notes||null, is_installment: isParc, installments_count: isParc? Number(count): null, first_due_date: isParc? firstDue||null : null });
+    if (!parsed.success) { setErr(parsed.error.issues[0]?.message||"Verifique"); return; }
+    onSave({ person: parsed.data.person, description: parsed.data.description||null, kind: parsed.data.kind, amount: parsed.data.amount, due_date: isParc? null : (parsed.data.due_date||null), notes: parsed.data.notes||null, is_installment: parsed.data.is_installment, installments_count: parsed.data.installments_count||null, first_due_date: parsed.data.first_due_date||null });
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={onClose} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+          <motion.div initial={{ opacity:0, y:18, scale:0.98 }} animate={{ opacity:1, y:0, scale:1 }} exit={{ opacity:0, y:10, scale:0.98 }} className="fixed inset-x-0 bottom-0 lg:inset-auto lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 z-50 w-full lg:max-w-[520px] max-h-[88dvh] overflow-auto rounded-t-[20px] lg:rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-5 pb-[calc(1rem+var(--sab))] shadow-[0_24px_64px_rgba(0,0,0,0.24)]">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">{initial?"Editar dívida":"Nova dívida"}</h3>
+              <button onClick={onClose} className="h-8 w-8 rounded-full bg-[var(--card-soft)] grid place-items-center"><X className="h-4 w-4" /></button>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="flex gap-2">
+                <button onClick={()=>setKind("owed")} className={`flex-1 h-9 rounded-full text-xs font-semibold border ${kind==="owed"?"bg-[var(--accent)] text-white border-transparent":"bg-[var(--card-soft)] border-[var(--border)]"}`}>Eu devo</button>
+                <button onClick={()=>setKind("receivable")} className={`flex-1 h-9 rounded-full text-xs font-semibold border ${kind==="receivable"?"bg-emerald-500 text-white border-transparent":"bg-[var(--card-soft)] border-[var(--border)]"}`}>Me devem</button>
+              </div>
+
+              <div>
+                <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Pessoa / credor</label>
+                <Input value={person} onChange={e=>setPerson(e.target.value)} placeholder="Ex: João" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Descrição</label>
+                <Input value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Ex: empréstimo, lanche" className="mt-1" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Valor total (R$)</label>
+                  <Input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="500,00" inputMode="decimal" className="mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Vencimento</label>
+                  <Input type="date" value={due} onChange={e=>setDue(e.target.value)} className="mt-1" disabled={isParc} />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={isParc} onChange={e=>setIsParc(e.target.checked)} className="h-4 w-4" /> Parcelado
+              </label>
+
+              {isParc && (
+                <div className="grid grid-cols-2 gap-3 rounded-xl bg-[var(--card-soft)] border border-[var(--border)] p-3">
+                  <div>
+                    <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Parcelas</label>
+                    <Input type="number" min={2} max={48} value={count} onChange={e=>setCount(e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Primeiro vencimento</label>
+                    <Input type="date" value={firstDue} onChange={e=>setFirstDue(e.target.value)} className="mt-1" />
+                  </div>
+                  {preview && (
+                    <div className="col-span-2 mt-2 space-y-1 max-h-[120px] overflow-auto text-xs">
+                      {preview.map(p=> <div key={p.n} className="flex justify-between border-b border-[var(--border)] py-1"><span>{p.n}/{preview.length} — {p.due}</span><span className="font-medium">R$ {p.amount.toFixed(2).replace(".",",")}</span></div>)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs text-[var(--faint)] uppercase tracking-wide">Observações</label>
+                <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2} className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 text-sm" placeholder="Opcional" />
+              </div>
+
+              {err && <p className="text-xs text-red-600">{err}</p>}
+              <Button onClick={submit} className="w-full rounded-full">{initial?"Salvar":"Criar dívida"}</Button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}

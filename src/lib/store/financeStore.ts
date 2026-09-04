@@ -18,10 +18,10 @@ const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 const DEFAULT_ACCOUNTS: Account[] = [
-  { id: "acc-inter", name: "Inter", icon: "inter", type: "checking", color: "#FF6A30", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: "acc-nubank", name: "Nubank", icon: "nubank", type: "checking", color: "#820AD1", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: "acc-mp", name: "Mercado Pago", icon: "mercadopago", type: "wallet", color: "#00A9FF", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: "acc-bb", name: "Banco do Brasil", icon: "bb", type: "checking", color: "#FACC15", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "acc-inter", name: "Inter", icon: "inter", type: "checking", color: "#FF6A30", brand_domain: "inter.co", brand_key: "inter", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "acc-nubank", name: "Nubank", icon: "nubank", type: "checking", color: "#820AD1", brand_domain: "nubank.com.br", brand_key: "nubank", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "acc-mp", name: "Mercado Pago", icon: "mercadopago", type: "wallet", color: "#00A9FF", brand_domain: "mercadopago.com.br", brand_key: "mercadopago", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "acc-bb", name: "Banco do Brasil", icon: "bb", type: "checking", color: "#FACC15", brand_domain: "bb.com.br", brand_key: "bb", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
 type State = {
@@ -33,8 +33,11 @@ type State = {
   setHydrated: (v: boolean) => void;
   upsertAccount: (a: Account) => void;
   removeAccount: (id: string) => void;
+  setAccounts: (a: Account[]) => void;
   upsertCategory: (c: Category) => void;
+  setCategories: (c: Category[]) => void;
   upsertTransaction: (t: Transaction) => void;
+  setTransactions: (t: Transaction[]) => void;
   removeTransaction: (id: string) => void;
   pushAudit: (a: AuditEntry) => void;
   clearForSupabase: () => void;
@@ -71,16 +74,19 @@ export const useFinanceStore = create<State>()(
         return { accounts: exists ? s.accounts.map(x => x.id === a.id ? a : x) : [a, ...s.accounts] };
       }),
       removeAccount: (id) => set((s) => ({ accounts: s.accounts.filter(x => x.id !== id) })),
+      setAccounts: (a) => set({ accounts: a }),
       upsertCategory: (c) => set((s) => {
         const exists = s.categories.find(x => x.id === c.id);
         if (exists) return { categories: s.categories.map(x => x.id === c.id ? c : x) };
         if (s.categories.find(x => x.name.toLowerCase().trim() === c.name.toLowerCase().trim())) return s;
         return { categories: [c, ...s.categories] };
       }),
+      setCategories: (c) => set({ categories: c }),
       upsertTransaction: (t) => set((s) => {
         const exists = s.transactions.find(x => x.id === t.id);
         return { transactions: exists ? s.transactions.map(x => x.id === t.id ? t : x) : [t, ...s.transactions].sort((a,b) => +new Date(b.occurred_at) - +new Date(a.occurred_at)) };
       }),
+      setTransactions: (t) => set({ transactions: t.sort((a,b) => +new Date(b.occurred_at) - +new Date(a.occurred_at)) }),
       removeTransaction: (id) => set((s) => ({ transactions: s.transactions.filter(x => x.id !== id) })),
       pushAudit: (a) => set((s) => ({ audits: [a, ...s.audits].slice(0, 200) })),
       clearForSupabase: () => set({ accounts: [], categories: [], transactions: [], audits: [] }),

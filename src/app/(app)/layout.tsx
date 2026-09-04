@@ -8,7 +8,9 @@ import { QuickAdd } from "@/components/rise/QuickAdd";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
 import { useFinanceStore } from "@/lib/store/financeStore";
+import { useDebtStore } from "@/lib/store/debtStore";
 import { financeService } from "@/lib/services/finance";
+import { debtService } from "@/lib/services/debtService";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [quick, setQuick] = useState(false);
@@ -29,9 +31,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  // Auth gate + Supabase data sync
+  // Auth gate - inicia uma vez
   useEffect(() => {
     let cancelled = false;
+    let subscription: { unsubscribe: () => void } | null = null;
     (async () => {
       if (demoMode) {
         const has = (() => {
@@ -44,28 +47,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const supabase = createClient();
       if (!supabase) { router.replace("/login"); return; }
       const { data } = await supabase.auth.getSession();
-      if (!data.session) router.replace("/login");
-      else {
-        // Supabase mode: limpar demo residual e carregar dados reais antes de mostrar
-        if (!cancelled) {
-          try {
-            useFinanceStore.getState().clearForSupabase();
-            await financeService.refreshFromServer();
-            // escuta logout para limpar cache
-            const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-              if (event === "SIGNED_OUT") useFinanceStore.getState().clearForSupabase();
-            });
-            if (!cancelled) setReady(true);
-            // cleanup será no unmount; supabase remove não necessário aqui
-          } catch {
-            if (!cancelled) setReady(true);
-          }
-        }
+      if (!data.session) {
+        if (!cancelled) setReady(true);
+        router.replace("/login");
+        return;
       }
+      // Supabase mode: sync inicial uma vez por sessão
+      try {
+        useFinanceStore.getState().clearForSupabase();
+        useDebtStore.getState().clearForSupabase();
+        await Promise.all([financeService.refreshFromServer(), debtService.refreshFromServer()]);
+      } catch (e) {
+        console.error("finance/debt sync failed", e);
+      }
+      if (!cancelled) setReady(true);
+      const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "SIGNED_OUT") {
+          useFinanceStore.getState().clearForSupabase();
+          useDebtStore.getState().clearForSupabase();
+        }
+      });
+      subscription = sub.subscription;
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      subscription?.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, demoMode]);
+  }, []);
 
   if (!ready) {
     // skeleton durante verificação, evita flash de conteúdo sem auth

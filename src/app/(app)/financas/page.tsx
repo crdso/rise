@@ -7,6 +7,7 @@ import { useFinanceStore, calcAccountBalance } from "@/lib/store/financeStore";
 import { financeService } from "@/lib/services/finance";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { TransactionDialog } from "@/components/rise/TransactionDialog";
+import { FinanceNav } from "@/components/rise/FinanceNav";
 import { useToast } from "@/components/ui/toast";
 import Link from "next/link";
 
@@ -73,6 +74,7 @@ export default function FinancasPage() {
           <Button size="sm" className="rounded-full" onClick={()=>{ setDefaultType("expense"); setEditId(null); setOpen(true); }}><Wallet className="h-4 w-4" /> Gasto</Button>
           <Button size="sm" variant="soft" className="rounded-full" onClick={()=>{ setDefaultType("income"); setEditId(null); setOpen(true); }}><TrendingUp className="h-4 w-4" /> Receita</Button>
           <Link href="/financas/contas" className="h-9 rounded-full border border-[var(--border)] bg-[var(--card)] px-4 inline-flex items-center text-sm font-medium">Contas</Link>
+          <Link href="/financas/dividas" className="h-9 rounded-full border border-[var(--border)] bg-[var(--card)] px-4 inline-flex items-center text-sm font-medium">Dívidas</Link>
         </div>
       </div>
 
@@ -88,6 +90,9 @@ export default function FinancasPage() {
         </div>
       </div>
 
+      <div className="flex items-center gap-2">
+        <FinanceNav />
+      </div>
       <div className="flex flex-wrap gap-2 items-center">
         <div className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--card)] p-1">
           {(["all","expense","income"] as const).map(t=>(

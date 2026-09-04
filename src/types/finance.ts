@@ -5,6 +5,8 @@ export type Account = {
   icon?: string | null;
   type: AccountType;
   color?: string | null;
+  brand_domain?: string | null;
+  brand_key?: string | null;
   initial_balance: number;
   is_active: boolean;
   created_at: string;

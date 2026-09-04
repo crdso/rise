@@ -4,8 +4,9 @@ import { X, Wallet, TrendingUp, CalendarPlus, Bell, GraduationCap, HandCoins, Ha
 import { useState } from "react";
 import { AIParserService } from "@/lib/ai/parser";
 import { TransactionDialog } from "@/components/rise/TransactionDialog";
-import { useFinanceStore } from "@/lib/store/financeStore";
+import { DebtDialog } from "@/components/rise/DebtDialog";
 import { financeService } from "@/lib/services/finance";
+import { debtService } from "@/lib/services/debtService";
 import { useToast } from "@/components/ui/toast";
 import { formatBRL } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
   const [ai, setAi] = useState("");
   const [parsed, setParsed] = useState<string | null>(null);
   const [txOpen, setTxOpen] = useState<null | "expense" | "income">(null);
+  const [debtOpen, setDebtOpen] = useState(false);
   const { push } = useToast();
 
   const handleAI = async () => {
@@ -67,11 +69,15 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
                     <p className="mt-2 text-sm font-semibold">Receita</p>
                     <p className="text-xs text-[var(--muted-foreground)]">Salário, venda...</p>
                   </button>
+                  <button onClick={() => setDebtOpen(true)} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left hover:border-[var(--border-strong)] hover:bg-[var(--card-soft)] transition-colors">
+                    <HandCoins className="h-5 w-5 text-[var(--accent)]" />
+                    <p className="mt-2 text-sm font-semibold">Dívida</p>
+                    <p className="text-xs text-[var(--muted-foreground)]">Eu devo / Me devem</p>
+                  </button>
                   {[
                     { id: "event", label: "Evento", icon: CalendarPlus, desc: "Reunião, compromisso" },
                     { id: "reminder", label: "Lembrete", icon: Bell, desc: "Com horário/recorrente" },
                     { id: "school_task", label: "Atividade escolar", icon: GraduationCap, desc: "Prova, trabalho..." },
-                    { id: "debt", label: "Dívida", icon: HandCoins, desc: "Em breve" },
                   ].map((o) => (
                     <button key={o.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-left opacity-60">
                       <o.icon className="h-5 w-5 text-[var(--faint)]" />
@@ -99,6 +105,20 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
             await financeService.createTransaction(data as never);
             push({ title: data.type === "expense" ? "Gasto adicionado" : "Receita adicionada", desc: formatBRL(data.amount) });
             setTxOpen(null);
+            onClose();
+          } catch (e: unknown) {
+            push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
+          }
+        }}
+      />
+      <DebtDialog
+        open={debtOpen}
+        onClose={() => setDebtOpen(false)}
+        onSave={async (data) => {
+          try {
+            await debtService.createDebt(data as never);
+            push({ title: "Dívida criada", desc: data.person });
+            setDebtOpen(false);
             onClose();
           } catch (e: unknown) {
             push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });

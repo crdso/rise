@@ -3,6 +3,9 @@ import { useState } from "react";
 import { useFinanceStore, calcAccountBalance } from "@/lib/store/financeStore";
 import { financeService } from "@/lib/services/finance";
 import { AccountDialog } from "@/components/rise/AccountDialog";
+import { FinanceNav } from "@/components/rise/FinanceNav";
+import { BrandLogo } from "@/components/rise/BrandLogo";
+import { brandForAccount } from "@/lib/brands/registry";
 import { Button } from "@/components/ui/button";
 import { Plus, EyeOff, Eye, Pencil } from "lucide-react";
 import { formatBRL } from "@/lib/utils";
@@ -32,6 +35,7 @@ export default function ContasPage() {
 
   return (
     <div className="space-y-6">
+      <FinanceNav />
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight">Contas</h1>
@@ -47,7 +51,7 @@ export default function ContasPage() {
             <div key={a.id} className={`rounded-[18px] border p-4 flex flex-col gap-3 ${!a.is_active ? "opacity-60 bg-[var(--card-soft)] border-dashed" : "bg-[var(--card)] border-[var(--border)]"}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-9 w-9 rounded-xl grid place-items-center text-white font-bold text-xs" style={{ background: a.color || "#6B7280" }}>{a.name.slice(0,2).toUpperCase()}</div>
+                  {(() => { const b = brandForAccount(a); return b?.domain ? <BrandLogo domain={b.domain} name={b.name} size={36} className="rounded-xl border border-[var(--border)] bg-white" /> : <div className="h-9 w-9 rounded-xl grid place-items-center text-white font-bold text-xs" style={{ background: a.color || "#6B7280" }}>{a.name.slice(0,2).toUpperCase()}</div>; })()}
                   <div>
                     <p className="text-sm font-semibold leading-none">{a.name}</p>
                     <p className="text-xs text-[var(--faint)]">{a.type}</p>
