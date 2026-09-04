@@ -5,7 +5,7 @@ export const accountSchema = z.object({
   type: z.enum(["checking", "wallet", "cash", "card", "savings", "other"]),
   icon: z.string().max(40).optional().nullable(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Cor hex #RRGGBB").optional().nullable().or(z.literal("")),
-  initial_balance: z.coerce.number().min(0).max(999999999),
+  initial_balance: z.coerce.number().min(-999999999).max(999999999),
   is_active: z.boolean().optional().default(true),
 });
 
@@ -22,7 +22,7 @@ export const transactionSchema = z.object({
   category_id: z.string().uuid().nullable().optional(),
   category_name: z.string().max(30).optional().nullable(), // for inline create
   account_id: z.string().uuid().nullable().optional(),
-  occurred_at: z.string().min(10), // ISO datetime
+  occurred_at: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "occurred_at deve ser ISO datetime válido").refine((v) => new Date(v).toISOString() === new Date(Date.parse(v)).toISOString() || !Number.isNaN(Date.parse(v)), "ISO inválido"),
   notes: z.string().max(500).optional().nullable(),
   payment_method: z.string().max(40).optional().nullable(),
   is_recurring: z.boolean().optional().default(false),

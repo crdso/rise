@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { transactionSchema } from "@/lib/validators/finance";
 import type { Transaction } from "@/types/finance";
 import { useFinanceStore } from "@/lib/store/financeStore";
+import { toSaoPauloDateTimeLocal, fromSaoPauloDateTimeLocal, nowSaoPauloDateTimeLocal } from "@/lib/timezone";
 
 export function TransactionDialog({ open, onClose, onSave, initial, defaultType }: { open: boolean; onClose: () => void; onSave: (data: { type: "expense" | "income"; amount: number; description: string; account_id: string | null; category_id: string | null; category_name?: string | null; occurred_at: string; notes?: string | null; payment_method?: string | null; is_recurring: boolean }) => void; initial?: Transaction | null; defaultType?: "expense" | "income" }) {
   const { categories, accounts } = useFinanceStore();
@@ -15,7 +16,7 @@ export function TransactionDialog({ open, onClose, onSave, initial, defaultType 
   const [desc, setDesc] = useState("");
   const [cat, setCat] = useState("");
   const [acc, setAcc] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0,16));
+  const [date, setDate] = useState(() => nowSaoPauloDateTimeLocal());
   const [notes, setNotes] = useState("");
   const [method, setMethod] = useState("");
   const [recurring, setRecurring] = useState(false);
@@ -26,17 +27,17 @@ export function TransactionDialog({ open, onClose, onSave, initial, defaultType 
       if (initial) {
         setType(initial.type); setAmount(String(initial.amount).replace(".",",")); setDesc(initial.description||"");
         const c = categories.find(x=>x.id===initial.category_id); setCat(c?.name || "");
-        setAcc(initial.account_id || ""); setDate(initial.occurred_at.slice(0,16)); setNotes(initial.notes||""); setMethod(initial.payment_method||""); setRecurring(initial.is_recurring);
+        setAcc(initial.account_id || ""); setDate(toSaoPauloDateTimeLocal(initial.occurred_at)); setNotes(initial.notes||""); setMethod(initial.payment_method||""); setRecurring(initial.is_recurring);
       } else {
-        setType(defaultType || "expense"); setAmount(""); setDesc(""); setCat(""); setAcc(accounts[0]?.id || ""); setDate(new Date().toISOString().slice(0,16)); setNotes(""); setMethod(""); setRecurring(false);
+        setType(defaultType || "expense"); setAmount(""); setDesc(""); setCat(""); setAcc(accounts[0]?.id || ""); setDate(nowSaoPauloDateTimeLocal()); setNotes(""); setMethod(""); setRecurring(false);
       }
       setErr("");
     }
   }, [open, initial, defaultType, categories, accounts]);
 
   const submit = () => {
-    const iso = new Date(date).toISOString();
-    // resolve category: if cat matches existing -> id, else treat as new name
+    let iso: string;
+    try { iso = fromSaoPauloDateTimeLocal(date); } catch { setErr("Data/hora inválida"); return; }
     let category_id: string | null = null;
     let category_name: string | null = null;
     if (cat.trim()) {

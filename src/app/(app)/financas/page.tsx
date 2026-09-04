@@ -39,26 +39,26 @@ export default function FinancasPage() {
   const totalBalance = useMemo(() => {
     let bal = 0;
     for (const a of accounts) if (a.is_active) bal += calcAccountBalance(a, transactions);
-    // alternative: sum via calc: initial + incomes - expenses
-    const incomes = transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0);
-    const expenses = transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
-    const initials = accounts.filter(a=>a.is_active).reduce((s,a)=>s+a.initial_balance,0);
-    return initials + incomes - expenses;
+    return bal;
   }, [accounts, transactions]);
 
-  const handleSave = (data: Parameters<typeof financeService.createTransaction>[0]) => {
+  const handleSave = async (data: Parameters<typeof financeService.createTransaction>[0]) => {
     const d = data as unknown as { category_name?: string | null; category_id?: string | null; type: "expense" | "income"; amount: number };
-    if (editId) {
-      financeService.updateTransaction(editId, data as never);
-      push({ title: "Transação atualizada" });
-      setEditId(null);
-    } else {
-      if (d.category_name) {
-        const cat = financeService.ensureCategory(d.category_name);
-        (data as unknown as { category_id: string | null }).category_id = cat.id;
+    try {
+      if (editId) {
+        await financeService.updateTransaction(editId, data as never);
+        push({ title: "Transação atualizada" });
+        setEditId(null);
+      } else {
+        if (d.category_name) {
+          const cat = await financeService.ensureCategoryAsync(d.category_name);
+          (data as unknown as { category_id: string | null }).category_id = cat.id;
+        }
+        await financeService.createTransaction(data as never);
+        push({ title: d.type === "expense" ? "Gasto adicionado" : "Receita adicionada", desc: formatBRL(d.amount) });
       }
-      financeService.createTransaction(data as never);
-      push({ title: d.type === "expense" ? "Gasto adicionado" : "Receita adicionada", desc: formatBRL(d.amount) });
+    } catch (e: unknown) {
+      push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
     }
   };
 
@@ -137,7 +137,7 @@ export default function FinancasPage() {
             <p className="text-sm text-[var(--muted-foreground)] mt-1">Essa ação não pode ser desfeita e será auditada.</p>
             <div className="mt-4 flex gap-2 justify-end">
               <Button variant="ghost" size="sm" className="rounded-full" onClick={()=>setConfirmId(null)}>Cancelar</Button>
-              <Button size="sm" className="rounded-full bg-red-600 hover:bg-red-700 text-white" onClick={()=>{ financeService.deleteTransaction(confirmId); setConfirmId(null); push({ title: "Transação excluída", variant: "success" }); }}>Excluir</Button>
+              <Button size="sm" className="rounded-full bg-red-600 hover:bg-red-700 text-white" onClick={async ()=>{ try { await financeService.deleteTransaction(confirmId!); push({ title: "Transação excluída" }); } catch (e: unknown) { push({ title: "Erro ao excluir", desc: e instanceof Error ? e.message : "", variant: "error" }); } setConfirmId(null); }}>Excluir</Button>
             </div>
           </div>
         </div>

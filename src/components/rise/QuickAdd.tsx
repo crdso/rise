@@ -90,15 +90,19 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
         open={!!txOpen}
         defaultType={txOpen || "expense"}
         onClose={() => setTxOpen(null)}
-        onSave={(data) => {
-          if (data.category_name) {
-            const cat = financeService.ensureCategory(data.category_name);
-            data.category_id = cat.id;
+        onSave={async (data) => {
+          try {
+            if (data.category_name) {
+              const cat = await financeService.ensureCategoryAsync(data.category_name);
+              data.category_id = cat.id;
+            }
+            await financeService.createTransaction(data as never);
+            push({ title: data.type === "expense" ? "Gasto adicionado" : "Receita adicionada", desc: formatBRL(data.amount) });
+            setTxOpen(null);
+            onClose();
+          } catch (e: unknown) {
+            push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
           }
-          financeService.createTransaction(data as never);
-          push({ title: data.type === "expense" ? "Gasto adicionado" : "Receita adicionada", desc: formatBRL(data.amount) });
-          setTxOpen(null);
-          onClose();
         }}
       />
     </>

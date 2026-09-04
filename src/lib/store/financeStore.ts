@@ -1,7 +1,8 @@
 "use client";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { Account, Category, Transaction, AuditEntry } from "@/types/finance";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: "c1", name: "Alimentação", icon: "Utensils", color: "#F59E0B", created_at: new Date().toISOString() },
@@ -36,11 +37,27 @@ type State = {
   upsertTransaction: (t: Transaction) => void;
   removeTransaction: (id: string) => void;
   pushAudit: (a: AuditEntry) => void;
+  clearForSupabase: () => void;
+};
+
+// Storage que só persiste em demo mode. Em Supabase mode, retorna null e não grava.
+const demoStorage = {
+  getItem: (name: string) => {
+    if (isSupabaseConfigured()) return null;
+    try { return localStorage.getItem(name); } catch { return null; }
+  },
+  setItem: (name: string, value: string) => {
+    if (isSupabaseConfigured()) return;
+    try { localStorage.setItem(name, value); } catch {}
+  },
+  removeItem: (name: string) => {
+    try { localStorage.removeItem(name); } catch {}
+  },
 };
 
 export const useFinanceStore = create<State>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       accounts: DEFAULT_ACCOUNTS,
       categories: DEFAULT_CATEGORIES,
       transactions: [],
@@ -55,8 +72,7 @@ export const useFinanceStore = create<State>()(
       upsertCategory: (c) => set((s) => {
         const exists = s.categories.find(x => x.id === c.id);
         if (exists) return { categories: s.categories.map(x => x.id === c.id ? c : x) };
-        // deduplicate by name
-        if (s.categories.find(x => x.name.toLowerCase() === c.name.toLowerCase())) return s;
+        if (s.categories.find(x => x.name.toLowerCase().trim() === c.name.toLowerCase().trim())) return s;
         return { categories: [c, ...s.categories] };
       }),
       upsertTransaction: (t) => set((s) => {
@@ -65,26 +81,37 @@ export const useFinanceStore = create<State>()(
       }),
       removeTransaction: (id) => set((s) => ({ transactions: s.transactions.filter(x => x.id !== id) })),
       pushAudit: (a) => set((s) => ({ audits: [a, ...s.audits].slice(0, 200) })),
+      clearForSupabase: () => set({ accounts: [], categories: [], transactions: [], audits: [] }),
     }),
     {
-      name: "rise_finance_v1",
+      name: "rise_finance_demo_v2",
+      storage: createJSONStorage(() => demoStorage),
       partialize: (s) => ({ accounts: s.accounts, categories: s.categories, transactions: s.transactions, audits: s.audits }),
       onRehydrateStorage: () => (state) => state?.setHydrated(true),
+      skipHydration: false,
     }
   )
 );
 
+// Se entrar em Supabase mode, limpa cache demo que possa ter piscado antes do fetch
+if (typeof window !== "undefined" && isSupabaseConfigured()) {
+  // não carregar dados demo antigos em sessão Supabase
+  try {
+    const raw = localStorage.getItem("rise_finance_v1");
+    if (raw) localStorage.removeItem("rise_finance_v1");
+  } catch {}
+}
+
 // helpers
 export function calcBalance(accounts: Account[], transactions: Transaction[]) {
-  const map = new Map<string, number>();
-  for (const a of accounts) map.set(a.id, a.initial_balance);
   let total = 0;
-  for (const a of accounts) if (a.is_active) total += a.initial_balance;
-  for (const t of transactions) {
-    if (t.type === "income") total += t.amount;
-    else total -= t.amount;
+  const byAccount = new Map<string, number>();
+  for (const a of accounts) {
+    const bal = calcAccountBalance(a, transactions);
+    byAccount.set(a.id, bal);
+    if (a.is_active) total += bal;
   }
-  return { total, byAccount: map };
+  return { total, byAccount };
 }
 
 export function calcAccountBalance(acc: Account, txs: Transaction[]) {
@@ -93,4 +120,20 @@ export function calcAccountBalance(acc: Account, txs: Transaction[]) {
     bal += t.type === "income" ? t.amount : -t.amount;
   }
   return bal;
+}
+
+// Analytics helpers para gastos como foco (não só saldo)
+export function spendingByCategory(transactions: Transaction[], categories: Category[], month?: Date) {
+  const target = month || new Date();
+  const m = target.getMonth(), y = target.getFullYear();
+  const filtered = transactions.filter(t => t.type === "expense" && new Date(t.occurred_at).getMonth()===m && new Date(t.occurred_at).getFullYear()===y);
+  const total = filtered.reduce((s,t)=>s+t.amount,0);
+  const byCat: Record<string, { name: string; amount: number; pct: number }> = {};
+  for (const t of filtered) {
+    const name = categories.find(c=>c.id===t.category_id)?.name || "Outros";
+    byCat[name] = byCat[name] || { name, amount: 0, pct: 0 };
+    byCat[name].amount += t.amount;
+  }
+  Object.values(byCat).forEach(v => v.pct = total ? (v.amount/total)*100 : 0);
+  return { total, byCat: Object.values(byCat).sort((a,b)=>b.amount-a.amount) };
 }

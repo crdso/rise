@@ -15,15 +15,19 @@ export default function ContasPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const initial = editing ? accounts.find(a=>a.id===editing) || null : null;
 
-  const handleSave = (data: { name: string; type: import("@/types/finance").AccountType; color: string; initial_balance: number }) => {
-    if (editing) {
-      financeService.updateAccount(editing, data);
-      push({ title: "Conta atualizada" });
-    } else {
-      financeService.createAccount(data as never);
-      push({ title: "Conta criada", desc: data.name });
+  const handleSave = async (data: { name: string; type: import("@/types/finance").AccountType; color: string; initial_balance: number }) => {
+    try {
+      if (editing) {
+        await financeService.updateAccount(editing, data);
+        push({ title: "Conta atualizada" });
+      } else {
+        await financeService.createAccount(data as never);
+        push({ title: "Conta criada", desc: data.name });
+      }
+      setEditing(null);
+    } catch (e: unknown) {
+      push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
     }
-    setEditing(null);
   };
 
   return (
@@ -57,7 +61,7 @@ export default function ContasPage() {
                 <p className="text-xs text-[var(--muted-foreground)]">Inicial {formatBRL(a.initial_balance)}</p>
               </div>
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" className="rounded-full flex-1" onClick={()=>{ financeService.updateAccount(a.id, { is_active: !a.is_active }); push({ title: a.is_active ? "Conta desativada" : "Conta ativada" }); }}>
+                <Button variant="ghost" size="sm" className="rounded-full flex-1" onClick={async ()=>{ try { await financeService.updateAccount(a.id, { is_active: !a.is_active }); push({ title: a.is_active ? "Conta desativada" : "Conta ativada" }); } catch (e: unknown) { push({ title: "Erro", desc: e instanceof Error ? e.message : "", variant: "error" }); } }}>
                   {a.is_active ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />} {a.is_active ? "Desativar" : "Ativar"}
                 </Button>
               </div>

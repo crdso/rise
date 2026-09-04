@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = url.searchParams.get("q");
   const type = url.searchParams.get("type");
-  let query = supabase.from("transactions").select("*, account:accounts(*), category:transaction_categories(*)").eq("user_id", user.id).order("occurred_at", { ascending: false }).limit(50);
+  let query = supabase.from("transactions").select("*, account:accounts(*), category:transaction_categories(*)").eq("user_id", user.id).order("occurred_at", { ascending: false }).limit(80);
   if (type) query = query.eq("type", type);
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -23,6 +23,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ demo: true });
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY ausente." }, { status: 500 });
   const supabase = await createClient();
   if (!supabase) return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   const { data: { user } } = await supabase.auth.getUser();
@@ -31,16 +32,24 @@ export async function POST(req: Request) {
   const parsed = transactionSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const rest = parsed.data as unknown as { category_id?: string | null; category_name?: string | null; account_id?: string | null; type: string; amount: number; description?: string | null; occurred_at: string; notes?: string | null; payment_method?: string | null; is_recurring?: boolean };
-  let category_id = rest.category_id ?? null;
-  const category_name = rest.category_name ?? null;
-  // inline category create
-  if (!category_id && category_name) {
-    const { data: cat } = await supabase.from("transaction_categories").insert({ user_id: user.id, name: category_name }).select().single();
-    if (cat) category_id = (cat as { id: string }).id;
+
+  const { data, error } = await supabase.rpc("create_transaction_with_audit", {
+    p_user_id: user.id,
+    p_type: rest.type,
+    p_amount: rest.amount,
+    p_description: rest.description ?? null,
+    p_category_id: rest.category_id ?? null,
+    p_category_name: rest.category_name ?? null,
+    p_account_id: rest.account_id ?? null,
+    p_occurred_at: rest.occurred_at,
+    p_notes: rest.notes ?? null,
+    p_payment_method: rest.payment_method ?? null,
+    p_is_recurring: rest.is_recurring ?? false,
+  });
+
+  if (error) {
+    if (error.message.includes("account not found") || error.message.includes("category not found")) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const row = { user_id: user.id, type: rest.type, amount: rest.amount, description: rest.description, occurred_at: rest.occurred_at, notes: rest.notes, payment_method: rest.payment_method, is_recurring: rest.is_recurring, category_id, account_id: rest.account_id ?? null };
-  const { data, error } = await supabase.from("transactions").insert(row).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  try { await supabase.from("audit_logs").insert({ user_id: user.id, actor: "Você", action: (row as unknown as { type: string }).type === "expense" ? "criou uma despesa" : "criou uma receita", entity: "transaction", entity_id: data.id, after: row, origin: "web" }); } catch {}
   return NextResponse.json({ data });
 }
