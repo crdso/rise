@@ -17,25 +17,23 @@ const NAV: Array<{ href: "/" | "/financas" | "/calendario" | "/lembretes" | "/es
 export function Sidebar({ onQuickAdd }: { onQuickAdd: () => void }) {
   const path = usePathname();
   return (
-    <aside className="hidden lg:flex w-[260px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-xl sticky top-0 h-[100dvh] pt-[max(1rem,var(--sat))] pb-[max(1rem,var(--sab))]">
-      <div className="px-5 py-4 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-[var(--foreground)] text-[var(--background)] grid place-items-center font-bold text-sm">R</div>
-        <div>
-          <p className="text-sm font-semibold leading-none tracking-tight">RISE</p>
-          <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--faint)]">Painel pessoal</p>
+    <aside className="hidden lg:flex w-[248px] shrink-0 flex-col bg-[var(--background)] border-r border-[var(--border)] sticky top-0 h-[100dvh] pt-[max(1.25rem,var(--sat))] pb-[max(1rem,var(--sab))]">
+      <div className="px-5 flex items-center gap-3">
+        <div className="h-8 w-8 rounded-lg bg-[var(--foreground)] text-[var(--background)] grid place-items-center font-bold text-[13px] tracking-tight">R</div>
+        <div className="leading-none">
+          <p className="text-[14px] font-semibold tracking-tight">RISE</p>
+          <p className="text-[10px] tracking-[0.16em] uppercase text-[var(--faint)] font-medium">Privado</p>
         </div>
       </div>
 
-      <div className="px-3 mt-2">
-        <button onClick={onQuickAdd} className="w-full h-10 rounded-full bg-[var(--accent)] text-white font-semibold text-sm inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_var(--glow)] hover:brightness-[1.05] hover:-translate-y-[1px] active:translate-y-0 transition-all">
-          <Plus className="h-4 w-4" /> Adicionar
-        </button>
-        <button className="mt-2 w-full h-9 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 border border-[var(--border)]">
-          <Sparkles className="h-3.5 w-3.5" /> Adicionar com IA
+      <div className="px-3 mt-6">
+        <button onClick={onQuickAdd} className="w-full h-9 rounded-full bg-[var(--accent)] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 shadow-[0_6px_16px_var(--glow)] hover:brightness-[1.04] active:scale-[0.98] transition-all">
+          <Plus className="h-3.5 w-3.5" /> Adicionar
         </button>
       </div>
 
-      <nav className="mt-6 px-3 space-y-1">
+      <nav className="mt-7 px-2 space-y-0.5">
+        <p className="px-3 mb-2 text-[10px] tracking-[0.14em] uppercase text-[var(--faint)] font-semibold">Navegação</p>
         {NAV.map((i) => {
           const active = path === i.href || (i.href !== "/" && path?.startsWith(i.href));
           return (
@@ -43,22 +41,24 @@ export function Sidebar({ onQuickAdd }: { onQuickAdd: () => void }) {
               key={i.href}
               href={i.href}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                active ? "bg-[var(--card-soft)] text-[var(--foreground)] border border-[var(--border)]" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card-soft)]"
+                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
+                active ? "bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] shadow-sm" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--card-soft)] border border-transparent"
               )}
             >
-              <i.icon className={cn("h-4.5 w-4.5", active && "text-[var(--accent)]")} /> {i.label}
+              <i.icon className={cn("h-4 w-4", active ? "text-[var(--accent)]" : "opacity-70")} /> {i.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-auto px-4">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-soft)] p-4">
-          <p className="text-xs font-semibold">3º ano · Arquiva em</p>
-          <p className="text-xs text-[var(--muted-foreground)]">15/12/2026</p>
-          <div className="mt-2 h-1.5 rounded-full bg-[var(--muted)] overflow-hidden"><div className="h-full w-[72%] bg-[var(--accent)]" /></div>
-          <p className="mt-1 text-[11px] text-[var(--faint)]">72% do ano concluído</p>
+      <div className="mt-auto px-4 pt-6 border-t border-[var(--border)] mx-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-medium text-[var(--faint)]">3º ano · 2026</p>
+          <span className="text-[10px] rounded-full bg-[var(--card)] border border-[var(--border)] px-2 py-0.5 text-[var(--muted-foreground)]">72%</span>
+        </div>
+        <p className="text-xs text-[var(--muted-foreground)] mt-1">Arquiva em 15/12/2026</p>
+        <div className="mt-2 h-1 rounded-full bg-[var(--muted)] overflow-hidden">
+          <div className="h-full bg-[var(--accent)]" style={{ width: "72%" }} />
         </div>
       </div>
     </aside>

@@ -62,7 +62,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-[100dvh] flex bg-[var(--background)] text-[var(--foreground)]">
       <Sidebar onQuickAdd={() => setQuick(true)} />
       <div className="flex-1 min-w-0 flex flex-col">
-        <HeaderBar onQuickAdd={() => setQuick(true)} onCommand={() => setQuick(true)} />
+        <HeaderBar onCommand={() => setQuick(true)} />
         <main className="flex-1 mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8 py-6 pb-[calc(88px+var(--sab))] lg:pb-8">{children}</main>
       </div>
       <BottomNav onQuickAdd={() => setQuick(true)} onMore={() => setMoreOpen((v) => !v)} />

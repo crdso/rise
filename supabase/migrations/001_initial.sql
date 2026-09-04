@@ -213,12 +213,12 @@ alter table public.messaging_integrations enable row level security;
 -- Helper to avoid duplication: create policies for owner access
 do $$ declare t text; tables text[] := array['user_settings','accounts','transaction_categories','transactions','debts','events','reminders','school_workspaces','school_subjects','school_tasks','monthly_summaries','ai_interactions','messaging_integrations']; begin foreach t in array tables loop execute format('drop policy if exists "owner all %s" on public.%I', t, t); execute format('create policy "owner all %s" on public.%I for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)', t, t); end loop; end $$;
 
--- audit_logs: apenas service_role pode inserir via backend, authenticated pode ler próprio log, NINGUÉM pode update/delete
+-- audit_logs: IMUTÁVEL - apenas SELECT para authenticated; INSERT/UPDATE/DELETE somente service_role/server
 drop policy if exists "audit select own" on public.audit_logs;
 create policy "audit select own" on public.audit_logs for select to authenticated using (auth.uid() = user_id);
 drop policy if exists "audit insert service" on public.audit_logs;
-create policy "audit insert service" on public.audit_logs for insert to authenticated with check (auth.uid() = user_id);
--- sem policy de update/delete => imutável para client. Service role bypass RLS de qualquer forma.
+-- sem policy de INSERT/UPDATE/DELETE para authenticated => client não pode fabricar logs. Service role bypassa RLS.
+
 
 -- updated_at trigger
 create or replace function public.handle_updated_at() returns trigger language plpgsql as $$ begin new.updated_at = now(); return new; end $$;
@@ -230,10 +230,15 @@ drop trigger if exists set_updated_at_events on public.events; create trigger se
 drop trigger if exists set_updated_at_reminders on public.reminders; create trigger set_updated_at_reminders before update on public.reminders for each row execute function public.handle_updated_at();
 drop trigger if exists set_updated_at_school_tasks on public.school_tasks; create trigger set_updated_at_school_tasks before update on public.school_tasks for each row execute function public.handle_updated_at();
 
--- Função arquivamento escola 15/12/2026
+-- Função arquivamento escola 15/12/2026 - timezone America/Sao_Paulo
 create or replace function public.archive_school_workspaces_if_due() returns void language plpgsql as $$
 begin
-  update public.school_workspaces set status='archived', archived_at=now() where status='active' and year=2026 and now() >= '2026-12-15 00:00:00+00'::timestamptz and archived_at is null;
+  update public.school_workspaces
+  set status='archived', archived_at=now()
+  where status='active'
+    and year=2026
+    and archived_at is null
+    and (now() at time zone 'America/Sao_Paulo')::date >= date '2026-12-15';
   if found then
     insert into public.audit_logs (user_id, actor, action, entity, origin) select user_id, 'system', 'arquivou workspace escolar automaticamente (2026)', 'school_workspace', 'system' from public.school_workspaces where status='archived' and year=2026;
   end if;
