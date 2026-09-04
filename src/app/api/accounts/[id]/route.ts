@@ -15,14 +15,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const { data, error } = await supabase.rpc("update_account_with_audit", {
-    p_user_id: user.id,
     p_id: id,
-    p_name: parsed.data.name ?? null,
-    p_type: parsed.data.type ?? null,
-    p_icon: parsed.data.icon ?? null,
-    p_color: parsed.data.color ?? null,
-    p_initial_balance: parsed.data.initial_balance ?? null,
-    p_is_active: parsed.data.is_active ?? null,
+    p_patch: parsed.data as unknown as Record<string, unknown>,
   });
 
   if (error) {

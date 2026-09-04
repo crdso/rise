@@ -55,11 +55,13 @@ const demoStorage = {
   },
 };
 
+const isSupabase = isSupabaseConfigured();
+
 export const useFinanceStore = create<State>()(
   persist(
     (set) => ({
-      accounts: DEFAULT_ACCOUNTS,
-      categories: DEFAULT_CATEGORIES,
+      accounts: isSupabase ? [] : DEFAULT_ACCOUNTS,
+      categories: isSupabase ? [] : DEFAULT_CATEGORIES,
       transactions: [],
       audits: [],
       _hasHydrated: false,

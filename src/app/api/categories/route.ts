@@ -23,12 +23,16 @@ export async function POST(req: Request) {
   const json = await req.json();
   const parsed = categorySchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const norm = parsed.data.name.trim().toLowerCase();
-  // check existing case-insensitive
-  const { data: existing } = await supabase.from("transaction_categories").select("*").eq("user_id", user.id);
-  const found = (existing as { id: string; name: string }[] | null)?.find((c) => c.name.toLowerCase() === norm);
-  if (found) return NextResponse.json({ data: found });
-  const { data, error } = await supabase.from("transaction_categories").insert({ user_id: user.id, name: parsed.data.name.trim(), icon: parsed.data.icon || null, color: parsed.data.color || null }).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  const name = parsed.data.name.trim();
+  // tenta inserir com ON CONFLICT (índice lower(trim(name))) para evitar race
+  const { data: inserted, error: insertErr } = await supabase.from("transaction_categories").insert({ user_id: user.id, name, icon: parsed.data.icon || null, color: parsed.data.color || null }).select().single();
+  if (!insertErr && inserted) return NextResponse.json({ data: inserted });
+  // se conflitou (duplicata case-insensitive), busca existente
+  if (insertErr && (insertErr.message.includes("duplicate") || insertErr.code === "23505")) {
+    const { data: existing } = await supabase.from("transaction_categories").select("*").eq("user_id", user.id);
+    const found = (existing as { id: string; name: string }[] | null)?.find((c) => c.name.toLowerCase().trim() === name.toLowerCase().trim());
+    if (found) return NextResponse.json({ data: found });
+  }
+  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  return NextResponse.json({ data: inserted });
 }

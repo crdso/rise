@@ -7,6 +7,8 @@ import { HeaderBar } from "@/components/rise/HeaderBar";
 import { QuickAdd } from "@/components/rise/QuickAdd";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
+import { useFinanceStore } from "@/lib/store/financeStore";
+import { financeService } from "@/lib/services/finance";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [quick, setQuick] = useState(false);
@@ -27,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  // Auth gate
+  // Auth gate + Supabase data sync
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -43,7 +45,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (!supabase) { router.replace("/login"); return; }
       const { data } = await supabase.auth.getSession();
       if (!data.session) router.replace("/login");
-      else if (!cancelled) setReady(true);
+      else {
+        // Supabase mode: limpar demo residual e carregar dados reais antes de mostrar
+        if (!cancelled) {
+          try {
+            useFinanceStore.getState().clearForSupabase();
+            await financeService.refreshFromServer();
+            // escuta logout para limpar cache
+            const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+              if (event === "SIGNED_OUT") useFinanceStore.getState().clearForSupabase();
+            });
+            if (!cancelled) setReady(true);
+            // cleanup será no unmount; supabase remove não necessário aqui
+          } catch {
+            if (!cancelled) setReady(true);
+          }
+        }
+      }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

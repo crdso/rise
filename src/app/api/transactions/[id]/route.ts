@@ -16,18 +16,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const p = parsed.data as unknown as { type?: string; amount?: number; description?: string | null; category_id?: string | null; category_name?: string | null; account_id?: string | null; occurred_at?: string; notes?: string | null; payment_method?: string | null; is_recurring?: boolean };
 
   const { data, error } = await supabase.rpc("update_transaction_with_audit", {
-    p_user_id: user.id,
     p_id: id,
-    p_type: p.type ?? null,
-    p_amount: p.amount ?? null,
-    p_description: p.description ?? null,
-    p_category_id: p.category_id ?? null,
-    p_category_name: p.category_name ?? null,
-    p_account_id: p.account_id ?? null,
-    p_occurred_at: p.occurred_at ?? null,
-    p_notes: p.notes ?? null,
-    p_payment_method: p.payment_method ?? null,
-    p_is_recurring: p.is_recurring ?? null,
+    p_patch: json as Record<string, unknown>,
   });
 
   if (error) {
@@ -47,7 +37,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   const { error } = await supabase.rpc("delete_transaction_with_audit", {
-    p_user_id: user.id,
     p_id: id,
   });
 

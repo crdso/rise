@@ -23,7 +23,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ demo: true });
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY ausente." }, { status: 500 });
   const supabase = await createClient();
   if (!supabase) return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   const { data: { user } } = await supabase.auth.getUser();
@@ -34,7 +33,6 @@ export async function POST(req: Request) {
   const rest = parsed.data as unknown as { category_id?: string | null; category_name?: string | null; account_id?: string | null; type: string; amount: number; description?: string | null; occurred_at: string; notes?: string | null; payment_method?: string | null; is_recurring?: boolean };
 
   const { data, error } = await supabase.rpc("create_transaction_with_audit", {
-    p_user_id: user.id,
     p_type: rest.type,
     p_amount: rest.amount,
     p_description: rest.description ?? null,

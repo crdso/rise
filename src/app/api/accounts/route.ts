@@ -16,7 +16,6 @@ export async function GET() {
 
 export async function POST(req: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ demo: true });
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY ausente. Configure a chave service_role." }, { status: 500 });
   const supabase = await createClient();
   if (!supabase) return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,9 +24,8 @@ export async function POST(req: Request) {
   const parsed = accountSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  // RPC atômico: cria conta + audit em transação única
+  // RPC atômico: cria conta + audit em transação única (auth.uid() dentro da função)
   const { data, error } = await supabase.rpc("create_account_with_audit", {
-    p_user_id: user.id,
     p_name: parsed.data.name,
     p_type: parsed.data.type,
     p_icon: parsed.data.icon || null,

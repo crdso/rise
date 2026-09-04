@@ -61,16 +61,10 @@ export const financeService = {
   },
   async ensureCategoryAsync(name: string): Promise<Category> {
     if (!isSupabaseConfigured()) return this.ensureCategory(name);
-    const found = this.ensureCategory(name);
-    // ensureCategory already checks local store; in Supabase mode we still need to ensure server has it
-    // Call API to get-or-create
-    try {
-      const cat = await api<Category>("/api/categories", { method: "POST", body: JSON.stringify({ name }) });
-      useFinanceStore.getState().upsertCategory(cat);
-      return cat;
-    } catch {
-      return found;
-    }
+    // Supabase mode: não criar local antes do servidor
+    const cat = await api<Category>("/api/categories", { method: "POST", body: JSON.stringify({ name: name.trim() }) });
+    useFinanceStore.getState().upsertCategory(cat);
+    return cat;
   },
 
   // Transactions - unified
