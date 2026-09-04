@@ -1,0 +1,40 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+export function formatBRL(centsOrValue: number) {
+  const v = centsOrValue;
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+export function formatDate(date: string | Date, opts?: { withTime?: boolean; allDay?: boolean }) {
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (opts?.allDay) {
+    return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }).format(d);
+  }
+  if (opts?.withTime) {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    }).format(d);
+  }
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  }).format(d);
+}
+
+export function greeting(name = "Ezequias") {
+  const h = new Date().getHours();
+  if (h < 12) return `Bom dia, ${name}.`;
+  if (h < 18) return `Boa tarde, ${name}.`;
+  return `Boa noite, ${name}.`;
+}
