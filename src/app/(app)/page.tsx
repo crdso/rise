@@ -21,7 +21,6 @@ import {
   TodayWidget,
   UpcomingWidget,
   DebtsWidget,
-  AccountsWidget,
   ImportantWidget,
   SchoolWidget,
   WidgetLink,
@@ -29,7 +28,6 @@ import {
   type UpcomingEntry,
 } from "@/components/rise/dashboard/widgets";
 import {
-  accountBalance,
   categoryBreakdown,
   currentMonthKey,
   lastNDays,
@@ -82,7 +80,6 @@ export default function Dashboard() {
       categoryTotal: total,
       topCategory: slices[0]?.name ?? null,
       totalBalance: totalBalance(accounts, transactions),
-      activeAccounts: accounts.filter((account) => account.is_active).length,
       hasData: transactions.length > 0,
     };
   }, [accounts, transactions, categories, monthKey]);
@@ -195,6 +192,7 @@ export default function Dashboard() {
             pct={finance.pct}
             series={finance.series}
             topCategory={finance.topCategory}
+            totalBalance={finance.totalBalance}
             hasData={finance.hasData}
           />
         );
@@ -212,16 +210,6 @@ export default function Dashboard() {
             installments={installments}
             statusOf={debtStatus}
             remainingOf={debtRemaining}
-          />
-        );
-      case "accounts":
-        return (
-          <AccountsWidget
-            accounts={accounts}
-            transactions={transactions}
-            balanceOf={accountBalance}
-            totalBalance={finance.totalBalance}
-            activeAccounts={finance.activeAccounts}
           />
         );
       case "important":
@@ -248,8 +236,6 @@ export default function Dashboard() {
         return <WidgetLink href="/calendario" label="Calendário" />;
       case "debts":
         return <WidgetLink href="/financas/dividas" label="Dívidas" />;
-      case "accounts":
-        return <WidgetLink href="/financas/contas" label="Gerenciar" />;
       case "important":
         return <WidgetLink href="/importantes" label="Ver todos" />;
       case "school":

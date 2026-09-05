@@ -15,14 +15,12 @@ export type WidgetId =
   | "today"
   | "upcoming"
   | "debts"
-  | "accounts"
   | "important"
   | "school";
 
 /** Ordem padrão: o que importa primeiro é para onde o dinheiro foi. */
 export const DEFAULT_WIDGETS: WidgetId[] = [
   "spend",
-  "accounts",
   "today",
   "categories",
   "upcoming",
@@ -37,7 +35,6 @@ export const WIDGET_META: Record<WidgetId, { title: string; desc: string; span: 
   categories: { title: "Categorias", desc: "Para onde o dinheiro foi", span: "narrow" },
   upcoming: { title: "Próximos dias", desc: "O que vem pela frente", span: "narrow" },
   debts: { title: "Dívidas", desc: "Você deve e te devem", span: "narrow" },
-  accounts: { title: "Contas", desc: "Saldos calculados", span: "wide" },
   important: { title: "Fixados", desc: "Itens importantes fixados", span: "narrow" },
   school: { title: "Escola", desc: "Próximas entregas e provas", span: "narrow" },
 };

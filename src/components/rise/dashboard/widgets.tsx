@@ -1,15 +1,13 @@
 "use client";
 import Link from "next/link";
-import { ArrowUpRight, Bell, CalendarDays, GraduationCap, Wallet, Plus, Pin, Star } from "lucide-react";
+import { ArrowUpRight, Bell, CalendarDays, GraduationCap, Plus, Pin, Star } from "lucide-react";
 import { formatBRL } from "@/lib/utils";
 import { formatDateKey, saoPauloDateKey } from "@/lib/timezone";
 import { Sparkline } from "@/components/rise/charts/Sparkline";
 import { CategoryBars } from "@/components/rise/charts/CategoryBars";
 import { DeltaChip } from "@/components/rise/charts/DeltaChip";
-import { AccountTile } from "@/components/rise/AccountTile";
 import { WidgetEmpty } from "@/components/rise/dashboard/WidgetShell";
 import type { CategorySlice, DayPoint } from "@/lib/finance/analytics";
-import type { Account, Transaction } from "@/types/finance";
 import type { Debt, DebtInstallment, DebtPayment } from "@/types/debt";
 import type { ImportantItem } from "@/types/important";
 import type { SchoolTask } from "@/types/school";
@@ -45,6 +43,7 @@ export function SpendWidget({
   pct,
   series,
   topCategory,
+  totalBalance,
   hasData,
 }: {
   expense: number;
@@ -52,11 +51,12 @@ export function SpendWidget({
   pct: number | null;
   series: DayPoint[];
   topCategory: string | null;
+  totalBalance: number;
   hasData: boolean;
 }) {
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-6 lg:grid-cols-[minmax(13rem,1.6fr)_repeat(3,minmax(0,1fr))] lg:items-end">
         <div>
           <p className="text-[34px] sm:text-[40px] font-semibold tracking-[-0.03em] leading-none tnum">
             {formatBRL(expense)}
@@ -66,22 +66,34 @@ export function SpendWidget({
           </div>
         </div>
 
-        <div className="flex gap-6">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Recebido no mês</p>
-            <p className="text-[15px] font-semibold tnum mt-1">{formatBRL(income)}</p>
-          </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Sobrou no mês</p>
-            <p
-              className={`text-[15px] font-semibold tnum mt-1 ${
-                income - expense < 0 ? "text-[var(--negative)]" : "text-[var(--positive)]"
-              }`}
-            >
-              {formatBRL(income - expense)}
-            </p>
-          </div>
+        <div className="lg:border-l lg:border-[var(--border)] lg:pl-5">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Recebido no mês</p>
+          <p className="mt-1 text-[15px] font-semibold tnum">{formatBRL(income)}</p>
         </div>
+
+        <div className="lg:border-l lg:border-[var(--border)] lg:pl-5">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Sobrou no mês</p>
+          <p
+            className={`mt-1 text-[15px] font-semibold tnum ${
+              income - expense < 0 ? "text-[var(--negative)]" : "text-[var(--positive)]"
+            }`}
+          >
+            {formatBRL(income - expense)}
+          </p>
+        </div>
+
+        <Link
+          href="/financas/contas"
+          aria-label="Ver saldo total e contas"
+          className="group -m-1 rounded-lg p-1 transition-colors hover:bg-[var(--card-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:border-l lg:border-[var(--border)] lg:pl-6"
+        >
+          <p className="flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-[var(--faint)] group-hover:text-[var(--muted-foreground)]">
+            Saldo total <ArrowUpRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+          </p>
+          <p className={`mt-1 text-[15px] font-semibold tnum ${totalBalance < 0 ? "text-[var(--negative)]" : ""}`}>
+            {formatBRL(totalBalance)}
+          </p>
+        </Link>
       </div>
 
       {hasData ? (
@@ -273,73 +285,6 @@ export function DebtsWidget({
         );
       })}
     </ul>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-
-export function AccountsWidget({
-  accounts,
-  transactions,
-  balanceOf,
-  totalBalance,
-  activeAccounts,
-}: {
-  accounts: Account[];
-  transactions: Transaction[];
-  balanceOf: (a: Account, t: Transaction[]) => number;
-  totalBalance: number;
-  activeAccounts: number;
-}) {
-  const active = accounts.filter((a) => a.is_active);
-  return (
-    <div>
-      <Link
-        href="/financas/contas"
-        className="group mb-4 flex items-end justify-between gap-4 rounded-[16px] border border-[var(--border)] bg-[var(--card-soft)] px-4 py-3.5 transition-colors hover:border-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-        aria-label="Ver saldo total e contas"
-      >
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Saldo total</p>
-          <p className={`mt-1 text-[25px] font-semibold tracking-[-0.03em] leading-none tnum ${totalBalance < 0 ? "text-[var(--negative)]" : ""}`}>
-            {formatBRL(totalBalance)}
-          </p>
-        </div>
-        <span className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--muted-foreground)] group-hover:text-[var(--foreground)]">
-          {activeAccounts} {activeAccounts === 1 ? "conta ativa" : "contas ativas"} <ArrowUpRight className="h-3.5 w-3.5" />
-        </span>
-      </Link>
-
-      {active.length ? (
-        <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible">
-          {active.slice(0, 4).map((a) => (
-            <AccountTile
-              key={a.id}
-              name={a.name}
-              balance={balanceOf(a, transactions)}
-              color={a.color || "#6B7280"}
-              type={a.type}
-              brand_domain={a.brand_domain}
-              brand_key={a.brand_key}
-              fallback={a.name.slice(0, 2).toUpperCase()}
-            />
-          ))}
-        </div>
-      ) : (
-        <WidgetEmpty
-          action={
-            <Link
-              href="/financas/contas"
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--card-soft)] px-3 py-1.5 text-[12px] font-medium hover:border-[var(--border-strong)]"
-            >
-              <Wallet className="h-3.5 w-3.5" /> Adicionar conta
-            </Link>
-          }
-        >
-          Nenhuma conta ativa cadastrada.
-        </WidgetEmpty>
-      )}
-    </div>
   );
 }
 
