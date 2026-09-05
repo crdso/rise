@@ -115,7 +115,7 @@ export function BrandLogo({
   // conta sem marca (dinheiro, carteira)
   if (generic || !domain) {
     return (
-      <div
+      <span
         className={`grid place-items-center rounded-xl border border-[var(--border)] bg-[var(--card-soft)] text-[var(--muted-foreground)] ${className || ""}`}
         style={box}
         aria-label={name}
@@ -125,13 +125,13 @@ export function BrandLogo({
         ) : (
           <span className="text-[10px] font-bold">{initials}</span>
         )}
-      </div>
+      </span>
     );
   }
 
   if (loading) {
     return (
-      <div
+      <span
         className={`animate-pulse rounded-xl border border-[var(--border)] bg-[var(--card-soft)] ${className || ""}`}
         style={box}
         aria-label="Carregando logo"
@@ -175,7 +175,7 @@ export function BrandLogo({
 
   // Monograma com a cor da marca: marcador honesto, não uma logo imitada.
   return (
-    <div
+    <span
       className={`grid place-items-center rounded-xl border font-bold ${className || ""}`}
       style={{
         ...box,
@@ -187,7 +187,7 @@ export function BrandLogo({
       aria-label={name}
     >
       {initials}
-    </div>
+    </span>
   );
 }
 

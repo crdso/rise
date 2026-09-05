@@ -344,7 +344,7 @@ export default function FinancasPage() {
 
                 <div className="flex-1 min-w-0">
                   <p className="text-[13.5px] font-medium truncate">{t.description || cat?.name || "Sem descrição"}</p>
-                  <p className="text-[11.5px] text-[var(--muted-foreground)] truncate flex items-center gap-1.5">
+                  <div className="text-[11.5px] text-[var(--muted-foreground)] truncate flex items-center gap-1.5">
                     {cat?.name && <span>{cat.name}</span>}
                     <span className="text-[var(--faint)]">·</span>
                     <span>{formatDate(t.occurred_at, { withTime: true })}</span>
@@ -361,7 +361,7 @@ export default function FinancasPage() {
                         <span className="truncate">{acc.name}</span>
                       </>
                     )}
-                  </p>
+                  </div>
                 </div>
 
                 <p className={`text-[14px] font-semibold shrink-0 tnum ${expense ? "" : "text-[var(--positive)]"}`}>
