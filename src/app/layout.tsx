@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   description: "Painel pessoal: finanças, calendário, lembretes e escola.",
   manifest: "/manifest.json",
   applicationName: "RISE",
+  icons: {
+    icon: [{ url: "/icon.png", type: "image/png", sizes: "512x512" }],
+    apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
+  },
   appleWebApp: {
     capable: true,
     title: "RISE",

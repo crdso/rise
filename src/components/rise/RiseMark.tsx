@@ -9,7 +9,7 @@ export function RiseMark({ size = 24, className }: { size?: number; className?: 
       alt=""
       width={size}
       height={size}
-      className={`shrink-0 ${className || ""}`}
+      className={`shrink-0 object-contain ${className || ""}`}
     />
   );
 }

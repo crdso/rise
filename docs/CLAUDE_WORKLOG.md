@@ -40,7 +40,8 @@ push diretamente. Não há watcher de commit nem arquivo de sinalização.
 - Utilitários CSS novos: `.rise-rotating-border` (conic-gradient + mask, com
   `@property`), `.rise-spotlight`, `.tnum`, `.no-scrollbar`, bloco de
   `prefers-reduced-motion` e `[data-motion="reduced"]`.
-- Marca: `RiseMark` / `RiseBadge` / `RiseLogo` — o triângulo ascendente do favicon.
+- Marca: `RiseMark` / `RiseBadge` / `RiseLogo` usam o R metálico oficial em
+  `public/icons/R.png`, incluindo todos os ícones derivados.
   Badge "Privado" removido da sidebar. Removido o bloco falso "3º ano · 72%".
 - `next.config.ts`: `devIndicators: false` (opção oficial da v16 — confirmada na
   documentação; nada de esconder DOM do Next com CSS).
