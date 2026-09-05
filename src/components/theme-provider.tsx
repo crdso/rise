@@ -8,8 +8,10 @@ import {
   THEME_ORDER,
   DEFAULT_THEME,
   DEFAULT_CUSTOM,
+  ambientIntensityForCustom,
   buildCustomTheme,
   isPresetTheme,
+  normalizeCustomTheme,
   CUSTOM_VAR_KEYS,
   type ThemeId,
   type CustomTheme,
@@ -78,7 +80,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
   }, []);
 
-  /** A intensidade do ambiente vale para TODOS os temas, não só o personalizado. */
+  /** Aplica a opacidade ambiental já normalizada pela escala percentual customizada. */
   const applyAmbient = useCallback((intensity: number) => {
     document.documentElement.style.setProperty("--ambient-intensity", String(intensity));
   }, []);
@@ -87,7 +89,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedTheme = localStorage.getItem(K_THEME);
     const initial: ThemeId = savedTheme === "custom" || isPresetTheme(savedTheme) ? (savedTheme as ThemeId) : DEFAULT_THEME;
-    const savedCustom = readJSON<CustomTheme>(K_CUSTOM, DEFAULT_CUSTOM);
+    const savedCustom = normalizeCustomTheme(readJSON<CustomTheme>(K_CUSTOM, DEFAULT_CUSTOM));
     const savedMotion = localStorage.getItem(K_MOTION) === "1";
     const savedDensity = (localStorage.getItem(K_DENSITY) as Density) || "comfortable";
 
@@ -100,8 +102,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.setAttribute("data-theme", initial);
     root.setAttribute("data-density", savedDensity);
     if (savedMotion) root.setAttribute("data-motion", "reduced");
-    if (initial === "custom") applyCustomVars(savedCustom);
-    applyAmbient(savedCustom.intensity);
+    if (initial === "custom") {
+      applyCustomVars(savedCustom);
+      applyAmbient(ambientIntensityForCustom(savedCustom));
+    }
 
     // Em modo Supabase o servidor é a fonte da verdade; o localStorage acima
     // só evitou o flash. Se houver preferência salva, ela sobrescreve.
@@ -118,15 +122,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.setAttribute("data-theme", t);
         try { localStorage.setItem(K_THEME, t); } catch {}
       }
-      const nextCustom: CustomTheme = {
-        ...savedCustom,
-        ...(remote.custom_theme ?? {}),
-        intensity: remote.ambient_intensity ?? remote.custom_theme?.intensity ?? savedCustom.intensity,
-      };
+      const nextCustom = normalizeCustomTheme({ ...savedCustom, ...(remote.custom_theme ?? {}) });
       setCustomState(nextCustom);
-      applyAmbient(nextCustom.intensity);
-      if (resolvedTheme === "custom") applyCustomVars(nextCustom);
-      else applyCustomVars(null);
+      if (resolvedTheme === "custom") {
+        applyCustomVars(nextCustom);
+        applyAmbient(ambientIntensityForCustom(nextCustom));
+      } else {
+        applyCustomVars(null);
+        root.style.removeProperty("--ambient-intensity");
+      }
       try { localStorage.setItem(K_CUSTOM, JSON.stringify(nextCustom)); } catch {}
 
       if (typeof remote.reduced_motion === "boolean") {
@@ -156,8 +160,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       previewRef.current = null;
       setThemeState(t);
       document.documentElement.setAttribute("data-theme", t);
-      if (t === "custom") applyCustomVars(custom);
-      else applyCustomVars(null);
+      if (t === "custom") {
+        applyCustomVars(custom);
+        applyAmbient(ambientIntensityForCustom(custom));
+      } else {
+        applyCustomVars(null);
+        document.documentElement.style.removeProperty("--ambient-intensity");
+      }
       try {
         localStorage.setItem(K_THEME, t);
       } catch {}
@@ -168,15 +177,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setCustom = useCallback(
     (c: CustomTheme) => {
+      const next = normalizeCustomTheme(c);
       previewRef.current = null;
-      setCustomState(c);
-      applyAmbient(c.intensity);
-      if (theme === "custom") applyCustomVars(c);
+      setCustomState(next);
+      applyAmbient(ambientIntensityForCustom(next));
+      if (theme === "custom") applyCustomVars(next);
       try {
-        localStorage.setItem(K_CUSTOM, JSON.stringify(c));
+        localStorage.setItem(K_CUSTOM, JSON.stringify(next));
       } catch {}
       debounceSave(() => {
-        void settingsService.save({ custom_theme: { colors: c.colors, angle: c.angle, intensity: c.intensity }, ambient_intensity: c.intensity });
+        void settingsService.save({ custom_theme: next, ambient_intensity: ambientIntensityForCustom(next) });
       });
     },
     [theme, applyCustomVars, applyAmbient]
@@ -189,10 +199,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       previewRef.current = c;
       if (c) {
         applyCustomVars(c);
-        applyAmbient(c.intensity);
+        applyAmbient(ambientIntensityForCustom(c));
       } else {
-        applyCustomVars(theme === "custom" ? custom : null);
-        applyAmbient(custom.intensity);
+        if (theme === "custom") {
+          applyCustomVars(custom);
+          applyAmbient(ambientIntensityForCustom(custom));
+        } else {
+          applyCustomVars(null);
+          document.documentElement.style.removeProperty("--ambient-intensity");
+        }
       }
     },
     [theme, custom, applyCustomVars, applyAmbient]

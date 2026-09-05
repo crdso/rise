@@ -90,22 +90,45 @@ export function isPresetTheme(v: string | null | undefined): v is PresetThemeId 
    ============================================================ */
 
 export type CustomTheme = {
-  /** 2 a 5 cores. A primeira é o acento; as demais alimentam o gradiente. */
+  /** 2 a 5 cores distribuídas automaticamente nos stops do gradiente. */
   colors: string[];
-  /** direção do gradiente ambiental, em graus */
+  /** Direção do gradiente, em graus. */
   angle: number;
-  /** intensidade do ambiente (0.3 – 1.4) */
+  /** Influência das cores nas surfaces escuras, de 0 a 100. */
   intensity: number;
+  /** Preset de origem; alterações manuais limpam esse vínculo. */
+  presetId: string | null;
 };
 
 export const DEFAULT_CUSTOM: CustomTheme = {
-  colors: ["#5865F2", "#22C5C2", "#EC4899"],
-  angle: 135,
-  intensity: 1,
+  colors: ["#2C3FE7", "#261D83"],
+  angle: 48,
+  intensity: 80,
+  presetId: "deep-blurple",
 };
 
 export const CUSTOM_MIN_COLORS = 2;
 export const CUSTOM_MAX_COLORS = 5;
+
+export type CustomGradientPreset = {
+  id: string;
+  label: string;
+  colors: string[];
+  angle: number;
+  intensity: number;
+};
+
+export const CUSTOM_GRADIENT_PRESETS: CustomGradientPreset[] = [
+  { id: "midnight-indigo", label: "Midnight Indigo", colors: ["#5348CA", "#140730"], angle: 48, intensity: 80 },
+  { id: "crimson-night", label: "Crimson Night", colors: ["#950909", "#000000"], angle: 65, intensity: 84 },
+  { id: "deep-blurple", label: "Deep Blurple", colors: ["#2C3FE7", "#261D83"], angle: 48, intensity: 80 },
+  { id: "deep-ocean", label: "Deep Ocean", colors: ["#003E52", "#001019"], angle: 42, intensity: 76 },
+  { id: "emerald-night", label: "Emerald Night", colors: ["#065F46", "#020B09"], angle: 54, intensity: 78 },
+  { id: "amethyst", label: "Amethyst", colors: ["#5B21B6", "#16072D"], angle: 52, intensity: 82 },
+  { id: "cyan-abyss", label: "Cyan Abyss", colors: ["#007C87", "#00141D"], angle: 45, intensity: 80 },
+  { id: "onyx", label: "Onyx", colors: ["#18181B", "#050505"], angle: 135, intensity: 45 },
+  { id: "chroma-night", label: "Chroma Night", colors: ["#140730", "#2C3FE7", "#007C87"], angle: 48, intensity: 74 },
+];
 
 /* --- utilidades de cor (sem dependência externa) --- */
 
@@ -128,6 +151,32 @@ function rgbToHex(r: number, g: number, b: number) {
 export function rgba(hex: string, alpha: number) {
   const [r, g, b] = hexToRgb(hex);
   return `rgba(${r},${g},${b},${clamp(alpha, 0, 1)})`;
+}
+
+function isHex(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+/** Converte temas antigos (intensidade 0.3–1.4) para a escala atual de 0–100. */
+export function normalizeCustomTheme(value: Partial<CustomTheme> | null | undefined): CustomTheme {
+  const requestedColors = Array.isArray(value?.colors) ? value.colors.filter(isHex).slice(0, CUSTOM_MAX_COLORS) : [];
+  const colors = requestedColors.length >= CUSTOM_MIN_COLORS ? requestedColors : DEFAULT_CUSTOM.colors;
+  const rawIntensity = Number(value?.intensity);
+  const intensity = Number.isFinite(rawIntensity)
+    ? rawIntensity <= 2
+      ? Math.round(clamp((rawIntensity - 0.3) / 1.1, 0, 1) * 100)
+      : Math.round(clamp(rawIntensity, 0, 100))
+    : DEFAULT_CUSTOM.intensity;
+  const rawAngle = Number(value?.angle);
+  const angle = Number.isFinite(rawAngle) ? clamp(Math.round(rawAngle), 0, 360) : DEFAULT_CUSTOM.angle;
+  const presetId = typeof value?.presetId === "string" && CUSTOM_GRADIENT_PRESETS.some((preset) => preset.id === value.presetId)
+    ? value.presetId
+    : null;
+  return { colors, angle, intensity, presetId };
+}
+
+export function ambientIntensityForCustom(custom: CustomTheme): number {
+  return 0.3 + (normalizeCustomTheme(custom).intensity / 100) * 1.1;
 }
 
 /** Mistura linear entre duas cores. t=0 devolve a, t=1 devolve b. */
@@ -167,21 +216,28 @@ function ensureVivid(hex: string) {
  * impossível o tema personalizado virar claro, independente do que for escolhido.
  */
 export function buildCustomTheme(custom: CustomTheme): Record<string, string> {
-  const colors = (custom.colors.length ? custom.colors : DEFAULT_CUSTOM.colors).slice(0, CUSTOM_MAX_COLORS);
+  const normalized = normalizeCustomTheme(custom);
+  const colors = normalized.colors;
   const accent = ensureVivid(colors[0] || DEFAULT_CUSTOM.colors[0]);
   const second = ensureVivid(colors[1] || accent);
   const third = ensureVivid(colors[2] || second);
-  const intensity = clamp(custom.intensity ?? 1, 0.3, 1.4);
-  const angle = ((custom.angle ?? 135) % 360 + 360) % 360;
+  const intensity = normalized.intensity;
+  const influence = intensity / 100;
+  const angle = normalized.angle;
+  const gradientStops = colors.map((color, index) => `${color} ${Math.round((index / (colors.length - 1)) * 100)}%`).join(", ");
+  const gradient = `linear-gradient(${angle}deg, ${gradientStops})`;
+  const surfaceTint = 0.015 + influence * 0.115;
+  const backgroundTint = 0.01 + influence * 0.075;
+  const gradientAlpha = 0.04 + influence * 0.26;
 
-  // Bases neutras escuras, levemente tingidas pelo acento (no máximo 10%).
-  const bg = mix("#08090C", accent, 0.05);
-  const bgSoft = mix("#0D0F13", accent, 0.06);
-  const sidebar = mix("#0A0B0F", accent, 0.05);
-  const card = mix("#12141A", accent, 0.07);
-  const cardSoft = mix("#181B22", accent, 0.08);
-  const elevated = mix("#1E222A", accent, 0.09);
-  const muted = mix("#1D212A", accent, 0.08);
+  // Bases continuam escuras; o gradiente só as tinge, sem reduzir contraste.
+  const bg = mix("#08090C", accent, backgroundTint);
+  const bgSoft = mix("#0D0F13", second, backgroundTint);
+  const sidebar = mix("#0A0B0F", second, surfaceTint * 0.85);
+  const card = mix("#12141A", accent, surfaceTint);
+  const cardSoft = mix("#181B22", second, surfaceTint * 1.1);
+  const elevated = mix("#1E222A", third, surfaceTint * 1.2);
+  const muted = mix("#1D212A", accent, surfaceTint);
 
   // Posições do gradiente derivadas do ângulo escolhido.
   const rad = (angle * Math.PI) / 180;
@@ -189,6 +245,16 @@ export function buildCustomTheme(custom: CustomTheme): Record<string, string> {
   const py = Math.round(50 + Math.sin(rad) * 45);
 
   return {
+    "--theme-color-1": colors[0],
+    "--theme-color-2": colors[1],
+    "--theme-color-3": colors[2] || colors[1],
+    "--theme-color-4": colors[3] || colors[2] || colors[1],
+    "--theme-color-5": colors[4] || colors[3] || colors[2] || colors[1],
+    "--theme-gradient-angle": `${angle}deg`,
+    "--theme-gradient": gradient,
+    "--theme-intensity": `${intensity}%`,
+    "--theme-background-gradient": `linear-gradient(${angle}deg, ${rgba(colors[0], gradientAlpha)}, ${colors.slice(1).map((color) => rgba(color, gradientAlpha * 0.78)).join(", ")})`,
+    "--theme-sidebar-gradient": `linear-gradient(${(angle + 22) % 360}deg, ${rgba(second, gradientAlpha * 0.44)}, ${rgba(accent, gradientAlpha * 0.2)})`,
     "--background": bg,
     "--background-soft": bgSoft,
     "--sidebar": sidebar,
@@ -211,10 +277,9 @@ export function buildCustomTheme(custom: CustomTheme): Record<string, string> {
     "--ring": accent,
     "--selection": rgba(accent, 0.3),
     "--glow": rgba(accent, 0.34),
-    "--ambient-1": rgba(accent, 0.18),
-    "--ambient-2": rgba(second, 0.12),
-    "--ambient-3": rgba(third, 0.1),
-    "--ambient-intensity": String(intensity),
+    "--ambient-1": rgba(accent, 0.05 + influence * 0.16),
+    "--ambient-2": rgba(second, 0.04 + influence * 0.12),
+    "--ambient-3": rgba(third, 0.03 + influence * 0.1),
     "--ambient-x": `${px}%`,
     "--ambient-y": `${py}%`,
     "--chart-1": accent,

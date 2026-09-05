@@ -3,7 +3,7 @@ import type { SettingsPatch } from "@/lib/validators/settings";
 
 export type RemoteSettings = {
   theme: string | null;
-  custom_theme: { colors: string[]; angle: number; intensity: number } | null;
+  custom_theme: { colors: string[]; angle: number; intensity: number; presetId?: string | null } | null;
   ambient_intensity: number | null;
   reduced_motion: boolean | null;
   density: "comfortable" | "compact" | null;

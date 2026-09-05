@@ -40,7 +40,7 @@ d.setAttribute('data-theme',t);
 var dn=localStorage.getItem('rise_density');if(dn)d.setAttribute('data-density',dn);
 if(localStorage.getItem('rise_reduced_motion')==='1')d.setAttribute('data-motion','reduced');
 var c=localStorage.getItem('rise_custom_theme');
-if(c){var p=JSON.parse(c);if(p&&p.intensity)d.style.setProperty('--ambient-intensity',String(p.intensity));}
+ if(c&&t==='custom'){var p=JSON.parse(c);if(p&&typeof p.intensity==='number'){var i=p.intensity<=2?Math.max(.3,Math.min(1.4,p.intensity)):.3+Math.max(0,Math.min(100,p.intensity))/100*1.1;d.style.setProperty('--ambient-intensity',String(i));}}
 }catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

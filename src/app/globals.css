@@ -38,7 +38,7 @@ html {
   --sal: env(safe-area-inset-left);
   --sar: env(safe-area-inset-right);
 
-  /* intensidade do gradiente ambiental (0.3 – 1.4), ajustável em Configurações */
+  /* Opacidade do ambiente já normalizada pela engine de temas. */
   --ambient-intensity: 1;
   --scrim: rgba(0,0,0,0.52);
   --positive-foreground: #06160C;
@@ -340,6 +340,9 @@ html, body { transition: var(--transition-theme); }
   --ambient-1: rgba(124,140,248,0.14);
   --ambient-2: rgba(124,140,248,0.09);
   --ambient-3: rgba(124,140,248,0.06);
+  --theme-gradient: linear-gradient(48deg, #2C3FE7 0%, #261D83 100%);
+  --theme-background-gradient: linear-gradient(48deg, rgba(44,63,231,0.22), rgba(38,29,131,0.16));
+  --theme-sidebar-gradient: linear-gradient(70deg, rgba(38,29,131,0.12), rgba(44,63,231,0.06));
   --chart-1: #7479de; --chart-2: #9e6300; --chart-3: #00a6b9; --chart-4: #a14388; --chart-5: #3e9553;
   --positive: #4ADE80; --negative: #F87171; --warning: #FBBF24;
 }
@@ -355,6 +358,17 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+/* O gradiente personalizado entra na base e sidebar; cards permanecem escuros
+   e recebem apenas os tokens tintados produzidos pela theme engine. */
+[data-theme="custom"] .rise-app-shell,
+[data-theme="custom"] .rise-auth-shell {
+  background-image: var(--theme-background-gradient);
+  background-attachment: fixed;
+}
+[data-theme="custom"] .rise-sidebar {
+  background-image: var(--theme-sidebar-gradient);
 }
 
 input[type="color"] { color-scheme: dark; }

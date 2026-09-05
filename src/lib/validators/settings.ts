@@ -5,7 +5,8 @@ const hex = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Cor hex #RRGGBB");
 export const customThemeSchema = z.object({
   colors: z.array(hex).min(2).max(5),
   angle: z.number().min(0).max(360),
-  intensity: z.number().min(0.3).max(1.4),
+  intensity: z.number().int().min(0).max(100),
+  presetId: z.string().max(40).nullable(),
 });
 
 export const dashboardLayoutSchema = z.object({

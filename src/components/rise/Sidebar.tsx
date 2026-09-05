@@ -40,7 +40,7 @@ export function Sidebar({ onQuickAdd }: { onQuickAdd: () => void }) {
   const isActive = (href: NavHref) => (href === "/" ? path === "/" : !!path?.startsWith(href));
 
   return (
-    <aside className="hidden lg:flex w-[236px] shrink-0 flex-col bg-[var(--sidebar)] border-r border-[var(--border)] sticky top-0 h-[100dvh] pt-[max(1.25rem,var(--sat))] pb-[max(1rem,var(--sab))]">
+    <aside className="rise-sidebar hidden lg:flex w-[236px] shrink-0 flex-col bg-[var(--sidebar)] border-r border-[var(--border)] sticky top-0 h-[100dvh] pt-[max(1.25rem,var(--sat))] pb-[max(1rem,var(--sab))]">
       <div className="px-5">
         <Link href="/" className="inline-flex" aria-label="RISE — início">
           <RiseLogo size={30} />

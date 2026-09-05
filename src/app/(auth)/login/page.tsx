@@ -112,7 +112,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-[100dvh] bg-[var(--background)] overflow-hidden">
+    <div className="rise-auth-shell relative min-h-[100dvh] bg-[var(--background)] overflow-hidden">
       {/* fundo profundo + movimento ambiental muito lento */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden>
         <motion.div

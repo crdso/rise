@@ -1,167 +1,252 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Minus, RotateCcw } from "lucide-react";
+import { Check, Plus, RotateCcw, X } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
-import { ThemePreview } from "@/components/rise/ThemeSwitcher";
-import { buildCustomTheme, CUSTOM_MAX_COLORS, CUSTOM_MIN_COLORS, DEFAULT_CUSTOM, type CustomTheme } from "@/lib/themes";
+import {
+  buildCustomTheme,
+  CUSTOM_GRADIENT_PRESETS,
+  CUSTOM_MAX_COLORS,
+  CUSTOM_MIN_COLORS,
+  DEFAULT_CUSTOM,
+  normalizeCustomTheme,
+  type CustomTheme,
+} from "@/lib/themes";
 import { Button } from "@/components/ui/button";
 
-/**
- * Editor do tema personalizado.
- *
- * O usuário escolhe de 2 a 5 cores, a direção do gradiente e a intensidade do
- * ambiente. A luminosidade da base NÃO é editável — é por isso que o tema
- * personalizado não consegue virar claro, por mais claras que sejam as cores.
- *
- * Cada mexida aplica um preview ao vivo; sair sem confirmar restaura o salvo.
- */
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const EXTRA_COLORS = ["#007C87", "#5B21B6", "#950909"];
+
+function ColorStop({
+  color,
+  index,
+  removable,
+  onChange,
+  onRemove,
+}: {
+  color: string;
+  index: number;
+  removable: boolean;
+  onChange: (color: string) => void;
+  onRemove: () => void;
+}) {
+  const [hex, setHex] = useState(color);
+  useEffect(() => setHex(color), [color]);
+
+  const commitHex = (value: string) => {
+    if (HEX.test(value)) onChange(value.toUpperCase());
+    else setHex(color);
+  };
+
+  return (
+    <div className="flex min-w-[132px] items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card-soft)] p-1.5">
+      <label
+        className="relative grid h-9 w-9 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-lg border border-white/10"
+        style={{ background: color }}
+        title={`Escolher cor ${index + 1}`}
+      >
+        <input
+          type="color"
+          value={color}
+          onChange={(event) => onChange(event.target.value.toUpperCase())}
+          className="absolute inset-0 cursor-pointer opacity-0"
+          aria-label={`Color picker da cor ${index + 1}`}
+        />
+      </label>
+      <input
+        value={hex}
+        onChange={(event) => {
+          const value = event.target.value.toUpperCase();
+          setHex(value);
+          if (HEX.test(value)) onChange(value);
+        }}
+        onBlur={() => commitHex(hex)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+        aria-label={`Hexadecimal da cor ${index + 1}`}
+        className="min-w-0 flex-1 bg-transparent text-[12px] font-medium uppercase text-[var(--foreground)] outline-none placeholder:text-[var(--faint)]"
+      />
+      {removable && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          aria-label={`Remover cor ${index + 1}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function CustomThemeEditor() {
   const { theme, setTheme, custom, setCustom, resetCustom, previewCustom } = useTheme();
   const [draft, setDraft] = useState<CustomTheme>(custom);
 
   useEffect(() => setDraft(custom), [custom]);
 
-  // preview ao vivo enquanto o editor está montado
+  // Preview sem espera: cada controle aplica os tokens no documento inteiro.
   useEffect(() => {
     if (theme !== "custom") return;
     previewCustom(draft);
     return () => previewCustom(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, theme]);
+  }, [draft, theme, previewCustom]);
 
   const commit = (next: CustomTheme) => {
-    setDraft(next);
-    setCustom(next);
+    const normalized = normalizeCustomTheme(next);
+    setDraft(normalized);
+    if (theme !== "custom") setTheme("custom");
+    setCustom(normalized);
   };
 
-  const setColor = (i: number, hex: string) => {
+  const setColor = (index: number, color: string) => {
     const colors = [...draft.colors];
-    colors[i] = hex;
-    commit({ ...draft, colors });
+    colors[index] = color;
+    commit({ ...draft, colors, presetId: null });
   };
 
   const addColor = () => {
     if (draft.colors.length >= CUSTOM_MAX_COLORS) return;
-    commit({ ...draft, colors: [...draft.colors, draft.colors[draft.colors.length - 1] || "#5865F2"] });
+    const next = EXTRA_COLORS[draft.colors.length - CUSTOM_MIN_COLORS] || draft.colors[draft.colors.length - 1];
+    commit({ ...draft, colors: [...draft.colors, next], presetId: null });
   };
 
-  const removeColor = () => {
+  const removeColor = (index: number) => {
     if (draft.colors.length <= CUSTOM_MIN_COLORS) return;
-    commit({ ...draft, colors: draft.colors.slice(0, -1) });
+    commit({ ...draft, colors: draft.colors.filter((_, colorIndex) => colorIndex !== index), presetId: null });
   };
 
-  const previewTokens = buildCustomTheme(draft);
-  const preview: [string, string, string, string] = [previewTokens["--background"], previewTokens["--sidebar"], previewTokens["--card"], previewTokens["--accent"]];
+  const tokens = buildCustomTheme(draft);
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-[12px] border border-[var(--border)] bg-[var(--card-soft)] p-3">
-        <ThemePreview preview={preview} height={92} />
-        <p className="mt-2 text-[11.5px] text-[var(--faint)]">
-          A base escura é fixa. Você controla o acento e o ambiente — o RISE nunca vira claro.
+    <div className="space-y-6">
+      <div>
+        <p className="text-[14px] font-semibold">Personalize seu tema</p>
+        <p className="mt-1 text-[12px] text-[var(--muted-foreground)]">
+          Gradientes influenciam o ambiente e as superfícies sem comprometer a base escura.
         </p>
       </div>
 
-      {/* cores */}
-      <div>
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <p className="text-[12.5px] font-medium">
-            Cores <span className="text-[var(--faint)]">({draft.colors.length})</span>
-          </p>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={removeColor}
-              disabled={draft.colors.length <= CUSTOM_MIN_COLORS}
-              className="h-7 w-7 grid place-items-center rounded-lg border border-[var(--border)] bg-[var(--card-soft)] disabled:opacity-40"
-              aria-label="Remover cor"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={addColor}
-              disabled={draft.colors.length >= CUSTOM_MAX_COLORS}
-              className="h-7 w-7 grid place-items-center rounded-lg border border-[var(--border)] bg-[var(--card-soft)] disabled:opacity-40"
-              aria-label="Adicionar cor"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
+      <div className="overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--card-soft)] p-2">
+        <div className="relative h-[112px] overflow-hidden rounded-[11px]" style={{ background: tokens["--theme-gradient"] }}>
+          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(3,5,9,0.68),transparent_62%)]" />
+          <div className="absolute inset-x-4 top-4 flex items-center justify-between">
+            <span className="h-2 w-16 rounded-full bg-white/80" />
+            <span className="h-5 w-5 rounded-full border border-white/30 bg-black/20" />
+          </div>
+          <div className="absolute bottom-4 left-4 right-4 rounded-lg border border-white/15 bg-black/35 p-2.5 backdrop-blur-sm">
+            <span className="block h-1.5 w-20 rounded-full bg-white/70" />
+            <span className="mt-2 block h-1 w-3/5 rounded-full bg-white/35" />
           </div>
         </div>
+      </div>
+
+      <section aria-labelledby="custom-theme-colors">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <h3 id="custom-theme-colors" className="text-[12.5px] font-medium uppercase tracking-[0.06em] text-[var(--faint)]">Cores</h3>
+            <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">Stops distribuídos automaticamente.</p>
+          </div>
+          <span className="text-[11px] tnum text-[var(--faint)]">{draft.colors.length}/{CUSTOM_MAX_COLORS}</span>
+        </div>
         <div className="flex flex-wrap gap-2">
-          {draft.colors.map((c, i) => (
-            <label
-              key={i}
-              className="relative h-11 w-11 rounded-xl border border-[var(--border)] overflow-hidden cursor-pointer"
-              style={{ background: c }}
-              title={i === 0 ? "Cor de acento" : `Cor ${i + 1} do ambiente`}
-            >
-              <input
-                type="color"
-                value={c}
-                onChange={(e) => setColor(i, e.target.value)}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-                aria-label={i === 0 ? "Cor de acento" : `Cor ${i + 1}`}
-              />
-              {i === 0 && (
-                <span className="absolute inset-x-0 bottom-0 bg-black/45 text-[8.5px] text-white text-center leading-[13px]">
-                  acento
-                </span>
-              )}
-            </label>
+          {draft.colors.map((color, index) => (
+            <ColorStop
+              key={`${color}-${index}`}
+              color={color}
+              index={index}
+              removable={draft.colors.length > CUSTOM_MIN_COLORS}
+              onChange={(next) => setColor(index, next)}
+              onRemove={() => removeColor(index)}
+            />
           ))}
+          <button
+            type="button"
+            onClick={addColor}
+            disabled={draft.colors.length >= CUSTOM_MAX_COLORS}
+            className="inline-flex h-12 items-center gap-1.5 rounded-xl border border-dashed border-[var(--border-strong)] px-3 text-[12px] font-medium text-[var(--muted-foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          >
+            <Plus className="h-3.5 w-3.5" /> Adicionar cor
+          </button>
         </div>
-      </div>
+      </section>
 
-      {/* direção */}
-      <div>
-        <div className="flex items-center justify-between">
-          <label htmlFor="angle" className="text-[12.5px] font-medium">
-            Direção do gradiente
-          </label>
-          <span className="text-[11.5px] tnum text-[var(--muted-foreground)]">{draft.angle}°</span>
+      <section className="grid gap-4 sm:grid-cols-2" aria-label="Controles do gradiente">
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="custom-theme-angle" className="text-[12.5px] font-medium">Direção do gradiente</label>
+            <output htmlFor="custom-theme-angle" className="text-[12px] tnum text-[var(--muted-foreground)]">{draft.angle}°</output>
+          </div>
+          <input
+            id="custom-theme-angle"
+            type="range"
+            min={0}
+            max={360}
+            step={1}
+            value={draft.angle}
+            onChange={(event) => commit({ ...draft, angle: Number(event.target.value), presetId: null })}
+            className="mt-3 h-2 w-full cursor-pointer accent-[var(--accent)]"
+          />
+          <div className="mt-1 flex justify-between text-[10.5px] text-[var(--faint)]"><span>0°</span><span>360°</span></div>
         </div>
-        <input
-          id="angle"
-          type="range"
-          min={0}
-          max={360}
-          step={5}
-          value={draft.angle}
-          onChange={(e) => commit({ ...draft, angle: Number(e.target.value) })}
-          className="mt-2 w-full accent-[var(--accent)]"
-        />
-      </div>
 
-      {/* intensidade */}
-      <div>
-        <div className="flex items-center justify-between">
-          <label htmlFor="intensity" className="text-[12.5px] font-medium">
-            Intensidade do ambiente
-          </label>
-          <span className="text-[11.5px] tnum text-[var(--muted-foreground)]">{draft.intensity.toFixed(2)}</span>
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="custom-theme-intensity" className="text-[12.5px] font-medium">Intensidade da cor</label>
+            <output htmlFor="custom-theme-intensity" className="text-[12px] tnum text-[var(--muted-foreground)]">{draft.intensity}%</output>
+          </div>
+          <input
+            id="custom-theme-intensity"
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={draft.intensity}
+            onChange={(event) => commit({ ...draft, intensity: Number(event.target.value), presetId: null })}
+            className="mt-3 h-2 w-full cursor-pointer accent-[var(--accent)]"
+          />
+          <div className="mt-1 flex justify-between text-[10.5px] text-[var(--faint)]"><span>0%</span><span>100%</span></div>
         </div>
-        <input
-          id="intensity"
-          type="range"
-          min={0.3}
-          max={1.4}
-          step={0.05}
-          value={draft.intensity}
-          onChange={(e) => commit({ ...draft, intensity: Number(e.target.value) })}
-          className="mt-2 w-full accent-[var(--accent)]"
-        />
-        <p className="mt-1 text-[11px] text-[var(--faint)]">Vale para todos os temas, não só o personalizado.</p>
-      </div>
+      </section>
 
-      <div className="flex flex-wrap gap-2 pt-1">
+      <section aria-labelledby="custom-theme-presets">
+        <div className="mb-2">
+          <h3 id="custom-theme-presets" className="text-[12.5px] font-medium uppercase tracking-[0.06em] text-[var(--faint)]">Temas</h3>
+          <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">Presets escuros prontos para usar.</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          {CUSTOM_GRADIENT_PRESETS.map((preset) => {
+            const selected = draft.presetId === preset.id;
+            const gradient = buildCustomTheme({ ...preset, presetId: preset.id })["--theme-gradient"];
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => commit({ ...preset, presetId: preset.id })}
+                aria-label={`Aplicar ${preset.label}`}
+                aria-pressed={selected}
+                title={preset.label}
+                className={`group relative aspect-[1.35] overflow-hidden rounded-lg border transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+                  selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border)] hover:border-[var(--border-strong)]"
+                }`}
+                style={{ background: gradient }}
+              >
+                <span className="absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.12),transparent_55%)]" />
+                {selected && <span className="absolute right-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]"><Check className="h-2.5 w-2.5" /></span>}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
         {theme !== "custom" && (
           <Button size="sm" variant="soft" className="rounded-full" onClick={() => setTheme("custom")}>
             Usar tema personalizado
           </Button>
         )}
-        <Button size="sm" variant="ghost" className="rounded-full" onClick={resetCustom}>
+        <Button size="sm" variant="ghost" className="rounded-full" onClick={() => resetCustom()}>
           <RotateCcw className="h-3.5 w-3.5" /> Restaurar
         </Button>
       </div>

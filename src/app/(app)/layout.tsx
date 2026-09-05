@@ -110,7 +110,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [demoMode, router]);
 
   return (
-    <div className="min-h-[100dvh] flex bg-[var(--background)] text-[var(--foreground)]">
+    <div className="rise-app-shell min-h-[100dvh] flex bg-[var(--background)] text-[var(--foreground)]">
       <Sidebar onQuickAdd={() => setQuick(true)} />
       <div className="flex-1 min-w-0 flex flex-col">
         <HeaderBar onCommand={() => setQuick(true)} />

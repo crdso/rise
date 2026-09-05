@@ -215,7 +215,7 @@ export default function ConfiguracoesPage() {
                 </div>
               </SettingsSection>
 
-              <SettingsSection title="Tema personalizado" description="Suas cores sobre a base escura do RISE.">
+              <SettingsSection title="Tema personalizado" description="Gradientes escuros que respeitam a legibilidade do RISE.">
                 <CustomThemeEditor />
               </SettingsSection>
 
