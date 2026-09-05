@@ -5,7 +5,7 @@ import Image from "next/image";
 export function RiseMark({ size = 24, className }: { size?: number; className?: string }) {
   return (
     <Image
-      src="/icons/RISE.png"
+      src="/icons/R.png"
       alt=""
       width={size}
       height={size}
