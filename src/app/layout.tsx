@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
+import { buildCustomTheme } from "@/lib/themes";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const space = Space_Grotesk({ subsets: ["latin"], variable: "--font-space", display: "swap" });
@@ -40,7 +41,7 @@ d.setAttribute('data-theme',t);
 var dn=localStorage.getItem('rise_density');if(dn)d.setAttribute('data-density',dn);
 if(localStorage.getItem('rise_reduced_motion')==='1')d.setAttribute('data-motion','reduced');
 var c=localStorage.getItem('rise_custom_theme');
- if(c&&t==='custom'){var p=JSON.parse(c);if(p&&typeof p.intensity==='number'){var i=p.intensity<=2?Math.max(.3,Math.min(1.4,p.intensity)):.3+Math.max(0,Math.min(100,p.intensity))/100*1.1;d.style.setProperty('--ambient-intensity',String(i));}}
+ if(c&&t==='custom'){var b=(${buildCustomTheme.toString()})(JSON.parse(c));Object.keys(b).forEach(function(k){d.style.setProperty(k,b[k]);});d.style.setProperty('--ambient-intensity',String(.3+Number(b['--theme-intensity'].replace('%',''))/100*1.1));}
 }catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -17,8 +17,8 @@ export type RemoteSettings = {
  * service não faz nada. Em modo Supabase, o servidor é a fonte da verdade e o
  * localStorage vira só um cache para evitar flash na primeira pintura.
  *
- * As escritas são "melhor esforço": falha de rede não pode quebrar a UI de
- * configurações, só deixar de sincronizar.
+ * As escritas preservam a UI local quando falham, mas expõem a rejeição para
+ * que cada consumidor possa informar ou reagendar a sincronização.
  */
 export const settingsService = {
   async load(): Promise<RemoteSettings | null> {
@@ -33,16 +33,14 @@ export const settingsService = {
     }
   },
 
-  async save(patch: SettingsPatch): Promise<void> {
+  async save(patch: SettingsPatch, options?: { keepalive?: boolean }): Promise<void> {
     if (!isSupabaseConfigured()) return;
-    try {
-      await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-    } catch {
-      /* melhor esforço */
-    }
+    const response = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+      keepalive: options?.keepalive,
+    });
+    if (!response.ok) throw new Error(`Falha ao sincronizar configurações (${response.status})`);
   },
 };

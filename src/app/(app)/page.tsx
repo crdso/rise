@@ -154,7 +154,7 @@ export default function Dashboard() {
       return;
     }
     const t = setTimeout(() => {
-      void settingsService.save({ dashboard: { order, hidden, spans } });
+      void settingsService.save({ dashboard: { order, hidden, spans } }).catch(() => console.warn("[rise-settings] dashboard sync failed."));
     }, 700);
     return () => clearTimeout(t);
   }, [order, hidden, spans]);

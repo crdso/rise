@@ -143,11 +143,6 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
-function rgbToHex(r: number, g: number, b: number) {
-  const to = (n: number) => clamp(Math.round(n), 0, 255).toString(16).padStart(2, "0");
-  return `#${to(r)}${to(g)}${to(b)}`;
-}
-
 export function rgba(hex: string, alpha: number) {
   const [r, g, b] = hexToRgb(hex);
   return `rgba(${r},${g},${b},${clamp(alpha, 0, 1)})`;
@@ -179,14 +174,6 @@ export function ambientIntensityForCustom(custom: CustomTheme): number {
   return 0.3 + (normalizeCustomTheme(custom).intensity / 100) * 1.1;
 }
 
-/** Mistura linear entre duas cores. t=0 devolve a, t=1 devolve b. */
-function mix(a: string, b: string, t: number) {
-  const [r1, g1, b1] = hexToRgb(a);
-  const [r2, g2, b2] = hexToRgb(b);
-  const k = clamp(t, 0, 1);
-  return rgbToHex(r1 + (r2 - r1) * k, g1 + (g2 - g1) * k, b1 + (b2 - b1) * k);
-}
-
 /** Luminância relativa (WCAG) — usada para decidir texto sobre o acento. */
 export function luminance(hex: string) {
   const [r, g, b] = hexToRgb(hex).map((v) => {
@@ -196,16 +183,17 @@ export function luminance(hex: string) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** Texto legível sobre uma cor sólida. */
-export function readableOn(hex: string) {
-  return luminance(hex) > 0.42 ? "#0A0B0D" : "#FFFFFF";
+/** Relação de contraste WCAG entre duas cores opacas. */
+export function contrastRatio(a: string, b: string) {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
 }
 
-/** Garante que o acento tenha presença suficiente sobre fundo escuro. */
-function ensureVivid(hex: string) {
-  const l = luminance(hex);
-  if (l < 0.06) return mix(hex, "#FFFFFF", 0.42); // acento quase preto some no fundo
-  return hex;
+/** Texto legível sobre o acento: escolhe a opção com maior contraste WCAG. */
+export function readableOn(hex: string) {
+  const white = "#FFFFFF";
+  const dark = "#0A0B0D";
+  return contrastRatio(white, hex) >= contrastRatio(dark, hex) ? white : dark;
 }
 
 /**
@@ -216,14 +204,61 @@ function ensureVivid(hex: string) {
  * impossível o tema personalizado virar claro, independente do que for escolhido.
  */
 export function buildCustomTheme(custom: CustomTheme): Record<string, string> {
-  const normalized = normalizeCustomTheme(custom);
-  const colors = normalized.colors;
-  const accent = ensureVivid(colors[0] || DEFAULT_CUSTOM.colors[0]);
-  const second = ensureVivid(colors[1] || accent);
-  const third = ensureVivid(colors[2] || second);
-  const intensity = normalized.intensity;
+  // Precisa ser autocontida: o layout serializa esta mesma função no <head>
+  // para gerar exatamente os mesmos tokens antes da hidratação.
+  const clampValue = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+  const toRgb = (hex: string) => {
+    let value = hex.replace("#", "").trim();
+    if (value.length === 3) value = value.split("").map((part) => part + part).join("");
+    if (!/^[0-9a-fA-F]{6}$/.test(value)) return [88, 101, 242] as const;
+    return [parseInt(value.slice(0, 2), 16), parseInt(value.slice(2, 4), 16), parseInt(value.slice(4, 6), 16)] as const;
+  };
+  const toHex = (red: number, green: number, blue: number) => {
+    const part = (value: number) => clampValue(Math.round(value), 0, 255).toString(16).padStart(2, "0");
+    return `#${part(red)}${part(green)}${part(blue)}`;
+  };
+  const mixValue = (first: string, second: string, amount: number) => {
+    const [r1, g1, b1] = toRgb(first);
+    const [r2, g2, b2] = toRgb(second);
+    const ratio = clampValue(amount, 0, 1);
+    return toHex(r1 + (r2 - r1) * ratio, g1 + (g2 - g1) * ratio, b1 + (b2 - b1) * ratio);
+  };
+  const rgbaValue = (hex: string, alpha: number) => {
+    const [red, green, blue] = toRgb(hex);
+    return `rgba(${red},${green},${blue},${clampValue(alpha, 0, 1)})`;
+  };
+  const luminanceValue = (hex: string) => {
+    const [red, green, blue] = toRgb(hex).map((component) => {
+      const value = component / 255;
+      return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const ensureVividValue = (hex: string) => luminanceValue(hex) < 0.06 ? mixValue(hex, "#FFFFFF", 0.42) : hex;
+  const readableValue = (hex: string) => {
+    const contrast = (first: string, second: string) => {
+      const [light, dark] = [luminanceValue(first), luminanceValue(second)].sort((a, b) => b - a);
+      return (light + 0.05) / (dark + 0.05);
+    };
+    return contrast("#FFFFFF", hex) >= contrast("#0A0B0D", hex) ? "#FFFFFF" : "#0A0B0D";
+  };
+  const value = (custom && typeof custom === "object" ? custom : {}) as Partial<CustomTheme>;
+  const requestedColors = Array.isArray(value.colors)
+    ? value.colors.filter((color): color is string => typeof color === "string" && /^#[0-9a-fA-F]{6}$/.test(color)).slice(0, 5)
+    : [];
+  const colors = requestedColors.length >= 2 ? requestedColors : ["#2C3FE7", "#261D83"];
+  const rawIntensity = Number(value.intensity);
+  const intensity = Number.isFinite(rawIntensity)
+    ? rawIntensity <= 2
+      ? Math.round(clampValue((rawIntensity - 0.3) / 1.1, 0, 1) * 100)
+      : Math.round(clampValue(rawIntensity, 0, 100))
+    : 80;
+  const rawAngle = Number(value.angle);
+  const angle = Number.isFinite(rawAngle) ? clampValue(Math.round(rawAngle), 0, 360) : 48;
+  const accent = ensureVividValue(colors[0]);
+  const second = ensureVividValue(colors[1] || accent);
+  const third = ensureVividValue(colors[2] || second);
   const influence = intensity / 100;
-  const angle = normalized.angle;
   const gradientStops = colors.map((color, index) => `${color} ${Math.round((index / (colors.length - 1)) * 100)}%`).join(", ");
   const gradient = `linear-gradient(${angle}deg, ${gradientStops})`;
   const surfaceTint = 0.015 + influence * 0.115;
@@ -231,13 +266,13 @@ export function buildCustomTheme(custom: CustomTheme): Record<string, string> {
   const gradientAlpha = 0.04 + influence * 0.26;
 
   // Bases continuam escuras; o gradiente só as tinge, sem reduzir contraste.
-  const bg = mix("#08090C", accent, backgroundTint);
-  const bgSoft = mix("#0D0F13", second, backgroundTint);
-  const sidebar = mix("#0A0B0F", second, surfaceTint * 0.85);
-  const card = mix("#12141A", accent, surfaceTint);
-  const cardSoft = mix("#181B22", second, surfaceTint * 1.1);
-  const elevated = mix("#1E222A", third, surfaceTint * 1.2);
-  const muted = mix("#1D212A", accent, surfaceTint);
+  const bg = mixValue("#08090C", accent, backgroundTint);
+  const bgSoft = mixValue("#0D0F13", second, backgroundTint);
+  const sidebar = mixValue("#0A0B0F", second, surfaceTint * 0.85);
+  const card = mixValue("#12141A", accent, surfaceTint);
+  const cardSoft = mixValue("#181B22", second, surfaceTint * 1.1);
+  const elevated = mixValue("#1E222A", third, surfaceTint * 1.2);
+  const muted = mixValue("#1D212A", accent, surfaceTint);
 
   // Posições do gradiente derivadas do ângulo escolhido.
   const rad = (angle * Math.PI) / 180;
@@ -253,8 +288,8 @@ export function buildCustomTheme(custom: CustomTheme): Record<string, string> {
     "--theme-gradient-angle": `${angle}deg`,
     "--theme-gradient": gradient,
     "--theme-intensity": `${intensity}%`,
-    "--theme-background-gradient": `linear-gradient(${angle}deg, ${rgba(colors[0], gradientAlpha)}, ${colors.slice(1).map((color) => rgba(color, gradientAlpha * 0.78)).join(", ")})`,
-    "--theme-sidebar-gradient": `linear-gradient(${(angle + 22) % 360}deg, ${rgba(second, gradientAlpha * 0.44)}, ${rgba(accent, gradientAlpha * 0.2)})`,
+    "--theme-background-gradient": `linear-gradient(${angle}deg, ${rgbaValue(colors[0], gradientAlpha)}, ${colors.slice(1).map((color) => rgbaValue(color, gradientAlpha * 0.78)).join(", ")})`,
+    "--theme-sidebar-gradient": `linear-gradient(${(angle + 22) % 360}deg, ${rgbaValue(second, gradientAlpha * 0.44)}, ${rgbaValue(accent, gradientAlpha * 0.2)})`,
     "--background": bg,
     "--background-soft": bgSoft,
     "--sidebar": sidebar,
@@ -265,28 +300,28 @@ export function buildCustomTheme(custom: CustomTheme): Record<string, string> {
     "--popover": cardSoft,
     "--popover-foreground": "#E9ECF2",
     "--foreground": "#E9ECF2",
-    "--border": rgba(accent, 0.12),
-    "--border-strong": rgba(accent, 0.24),
+    "--border": rgbaValue(accent, 0.12),
+    "--border-strong": rgbaValue(accent, 0.24),
     "--muted": muted,
     "--muted-foreground": "#9AA1AF",
     "--faint": "#78808E",
     "--accent": accent,
-    "--accent-strong": mix(accent, "#000000", 0.18),
-    "--accent-soft": rgba(accent, 0.16),
-    "--accent-foreground": readableOn(accent),
+    "--accent-strong": mixValue(accent, "#000000", 0.18),
+    "--accent-soft": rgbaValue(accent, 0.16),
+    "--accent-foreground": readableValue(accent),
     "--ring": accent,
-    "--selection": rgba(accent, 0.3),
-    "--glow": rgba(accent, 0.34),
-    "--ambient-1": rgba(accent, 0.05 + influence * 0.16),
-    "--ambient-2": rgba(second, 0.04 + influence * 0.12),
-    "--ambient-3": rgba(third, 0.03 + influence * 0.1),
+    "--selection": rgbaValue(accent, 0.3),
+    "--glow": rgbaValue(accent, 0.34),
+    "--ambient-1": rgbaValue(accent, 0.05 + influence * 0.16),
+    "--ambient-2": rgbaValue(second, 0.04 + influence * 0.12),
+    "--ambient-3": rgbaValue(third, 0.03 + influence * 0.1),
     "--ambient-x": `${px}%`,
     "--ambient-y": `${py}%`,
     "--chart-1": accent,
     "--chart-2": second,
     "--chart-3": third,
-    "--chart-4": colors[3] ? ensureVivid(colors[3]) : mix(accent, "#FFFFFF", 0.35),
-    "--chart-5": colors[4] ? ensureVivid(colors[4]) : mix(second, "#FFFFFF", 0.35),
+    "--chart-4": colors[3] ? ensureVividValue(colors[3]) : mixValue(accent, "#FFFFFF", 0.35),
+    "--chart-5": colors[4] ? ensureVividValue(colors[4]) : mixValue(second, "#FFFFFF", 0.35),
     "--positive": "#4ADE80",
     "--negative": "#F87171",
     "--warning": "#FBBF24",

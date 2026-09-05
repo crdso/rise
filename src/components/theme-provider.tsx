@@ -26,6 +26,7 @@ type Ctx = {
   order: typeof THEME_ORDER;
   custom: CustomTheme;
   setCustom: (c: CustomTheme) => void;
+  flushCustom: () => void;
   resetCustom: () => void;
   /** Preview temporário: aplica sem persistir. Passar null cancela. */
   previewCustom: (c: CustomTheme | null) => void;
@@ -45,12 +46,25 @@ const K_DENSITY = "rise_density";
 /** Salva no servidor no máximo uma vez por segundo — o slider dispara muito. */
 function makeDebouncer(ms: number) {
   let t: ReturnType<typeof setTimeout> | null = null;
-  return (fn: () => void) => {
+  let pending: ((keepalive: boolean) => void) | null = null;
+  const run = (keepalive = false) => {
     if (t) clearTimeout(t);
-    t = setTimeout(fn, ms);
+    t = null;
+    const fn = pending;
+    pending = null;
+    fn?.(keepalive);
+  };
+  return {
+    schedule(fn: (keepalive: boolean) => void) {
+      pending = fn;
+      if (t) clearTimeout(t);
+      t = setTimeout(() => run(), ms);
+    },
+    flush(keepalive = false) {
+      run(keepalive);
+    },
   };
 }
-const debounceSave = makeDebouncer(800);
 
 function readJSON<T>(key: string, fallback: T): T {
   try {
@@ -68,6 +82,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [reducedMotion, setReducedMotionState] = useState(false);
   const [density, setDensityState] = useState<Density>("comfortable");
   const previewRef = useRef<CustomTheme | null>(null);
+  const [customSave] = useState(() => makeDebouncer(800));
+  const unsyncedCustomRef = useRef<CustomTheme | null>(null);
+  const customRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const customRetryCountRef = useRef(0);
+  const persistCustomRef = useRef<(custom: CustomTheme, keepalive?: boolean) => Promise<void>>(async () => {});
 
   /** Escreve as variáveis do tema personalizado direto no <html>. */
   const applyCustomVars = useCallback((c: CustomTheme | null) => {
@@ -84,6 +103,56 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const applyAmbient = useCallback((intensity: number) => {
     document.documentElement.style.setProperty("--ambient-intensity", String(intensity));
   }, []);
+
+  const persistCustom = useCallback(async (custom: CustomTheme, keepalive = false) => {
+    try {
+      await settingsService.save(
+        { custom_theme: custom, ambient_intensity: ambientIntensityForCustom(custom) },
+        { keepalive }
+      );
+      if (unsyncedCustomRef.current === custom) {
+        unsyncedCustomRef.current = null;
+        customRetryCountRef.current = 0;
+      }
+    } catch {
+      unsyncedCustomRef.current = custom;
+      if (customRetryCountRef.current++ === 0) {
+        customRetryTimerRef.current = setTimeout(() => {
+          customRetryTimerRef.current = null;
+          const unsynced = unsyncedCustomRef.current;
+          if (unsynced) void persistCustomRef.current(unsynced);
+        }, 3_000);
+      }
+      console.warn("[rise-settings] custom theme sync failed; one retry was scheduled.");
+    }
+  }, []);
+
+  const flushCustom = useCallback(() => customSave.flush(), [customSave]);
+
+  useEffect(() => {
+    persistCustomRef.current = persistCustom;
+    return () => {
+      if (customRetryTimerRef.current) clearTimeout(customRetryTimerRef.current);
+    };
+  }, [persistCustom]);
+
+  useEffect(() => {
+    const flushOnExit = () => customSave.flush(true);
+    const retryWhenOnline = () => {
+      const unsynced = unsyncedCustomRef.current;
+      if (!unsynced) return;
+      if (customRetryTimerRef.current) clearTimeout(customRetryTimerRef.current);
+      customRetryTimerRef.current = null;
+      customRetryCountRef.current = 0;
+      void persistCustom(unsynced);
+    };
+    window.addEventListener("pagehide", flushOnExit);
+    window.addEventListener("online", retryWhenOnline);
+    return () => {
+      window.removeEventListener("pagehide", flushOnExit);
+      window.removeEventListener("online", retryWhenOnline);
+    };
+  }, [customSave, persistCustom]);
 
   // hidratação inicial
   useEffect(() => {
@@ -170,9 +239,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.setItem(K_THEME, t);
       } catch {}
-      void settingsService.save({ theme: t });
+      void settingsService.save({ theme: t }).catch(() => console.warn("[rise-settings] theme sync failed."));
     },
-    [custom, applyCustomVars]
+    [custom, applyCustomVars, applyAmbient]
   );
 
   const setCustom = useCallback(
@@ -185,11 +254,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.setItem(K_CUSTOM, JSON.stringify(next));
       } catch {}
-      debounceSave(() => {
-        void settingsService.save({ custom_theme: next, ambient_intensity: ambientIntensityForCustom(next) });
-      });
+      customRetryCountRef.current = 0;
+      if (customRetryTimerRef.current) {
+        clearTimeout(customRetryTimerRef.current);
+        customRetryTimerRef.current = null;
+      }
+      customSave.schedule((keepalive) => void persistCustom(next, keepalive));
     },
-    [theme, applyCustomVars, applyAmbient]
+    [theme, applyCustomVars, applyAmbient, customSave, persistCustom]
   );
 
   const resetCustom = useCallback(() => setCustom(DEFAULT_CUSTOM), [setCustom]);
@@ -221,7 +293,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(K_MOTION, v ? "1" : "0");
     } catch {}
-    void settingsService.save({ reduced_motion: v });
+    void settingsService.save({ reduced_motion: v }).catch(() => console.warn("[rise-settings] motion preference sync failed."));
   }, []);
 
   const setDensity = useCallback((d: Density) => {
@@ -230,7 +302,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(K_DENSITY, d);
     } catch {}
-    void settingsService.save({ density: d });
+    void settingsService.save({ density: d }).catch(() => console.warn("[rise-settings] density sync failed."));
   }, []);
 
   const value = useMemo<Ctx>(
@@ -241,6 +313,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       order: THEME_ORDER,
       custom,
       setCustom,
+      flushCustom,
       resetCustom,
       previewCustom,
       reducedMotion,
@@ -248,7 +321,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       density,
       setDensity,
     }),
-    [theme, setTheme, custom, setCustom, resetCustom, previewCustom, reducedMotion, setReducedMotion, density, setDensity]
+    [theme, setTheme, custom, setCustom, flushCustom, resetCustom, previewCustom, reducedMotion, setReducedMotion, density, setDensity]
   );
 
   return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;

@@ -81,7 +81,7 @@ function ColorStop({
 }
 
 export function CustomThemeEditor() {
-  const { theme, setTheme, custom, setCustom, resetCustom, previewCustom } = useTheme();
+  const { theme, setTheme, custom, setCustom, flushCustom, resetCustom, previewCustom } = useTheme();
   const [draft, setDraft] = useState<CustomTheme>(custom);
 
   useEffect(() => setDraft(custom), [custom]);
@@ -186,6 +186,8 @@ export function CustomThemeEditor() {
             step={1}
             value={draft.angle}
             onChange={(event) => commit({ ...draft, angle: Number(event.target.value), presetId: null })}
+            onPointerUp={flushCustom}
+            onBlur={flushCustom}
             className="mt-3 h-2 w-full cursor-pointer accent-[var(--accent)]"
           />
           <div className="mt-1 flex justify-between text-[10.5px] text-[var(--faint)]"><span>0°</span><span>360°</span></div>
@@ -204,6 +206,8 @@ export function CustomThemeEditor() {
             step={1}
             value={draft.intensity}
             onChange={(event) => commit({ ...draft, intensity: Number(event.target.value), presetId: null })}
+            onPointerUp={flushCustom}
+            onBlur={flushCustom}
             className="mt-3 h-2 w-full cursor-pointer accent-[var(--accent)]"
           />
           <div className="mt-1 flex justify-between text-[10.5px] text-[var(--faint)]"><span>0%</span><span>100%</span></div>
