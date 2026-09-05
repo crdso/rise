@@ -1,40 +1,22 @@
-/**
- * Marca do RISE — o triângulo ascendente do favicon.
- * Mesma forma em favicon, sidebar, login e ícones do PWA.
- * Usa currentColor, então herda a cor do contexto.
- */
+import Image from "next/image";
+
+/** Marca única do RISE, reutilizada em header, sidebar e login. */
 
 export function RiseMark({ size = 24, className }: { size?: number; className?: string }) {
   return (
-    <svg
-      viewBox="0 0 32 32"
+    <Image
+      src="/icons/RISE.png"
+      alt=""
       width={size}
       height={size}
-      className={className}
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M16 5.2 27.6 25.9H4.4z"
-        fill="currentColor"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
+      className={`shrink-0 ${className || ""}`}
+    />
   );
 }
 
-/** Marca dentro do disco escuro, como no favicon. */
+/** Alias sem moldura para os usos compactos da marca. */
 export function RiseBadge({ size = 32, className }: { size?: number; className?: string }) {
-  return (
-    <div
-      className={`shrink-0 rounded-full bg-[var(--sidebar)] text-[var(--foreground)] grid place-items-center border border-[var(--border-strong)] ${className || ""}`}
-      style={{ width: size, height: size }}
-    >
-      <RiseMark size={Math.round(size * 0.5)} />
-    </div>
-  );
+  return <RiseMark size={size} className={className} />;
 }
 
 /** Marca + wordmark. */
