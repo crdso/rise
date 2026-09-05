@@ -56,8 +56,8 @@ export function SpendWidget({
 }) {
   return (
     <div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-6 lg:grid-cols-[minmax(13rem,1.6fr)_repeat(3,minmax(0,1fr))] lg:items-end">
-        <div>
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
+        <div className="min-w-0">
           <p className="text-[34px] sm:text-[40px] font-semibold tracking-[-0.03em] leading-none tnum">
             {formatBRL(expense)}
           </p>
@@ -66,12 +66,26 @@ export function SpendWidget({
           </div>
         </div>
 
-        <div className="lg:border-l lg:border-[var(--border)] lg:pl-5">
+        <Link
+          href="/financas/contas"
+          aria-label="Ver saldo total e contas"
+          className="group -mx-1 rounded-xl border-l-2 border-[var(--accent)] px-3 py-2 transition-colors hover:bg-[var(--card-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+        >
+          <p className="flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
+            Saldo total <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent)] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </p>
+          <p className={`mt-1 text-[34px] sm:text-[40px] font-semibold tracking-[-0.03em] leading-none tnum ${totalBalance < 0 ? "text-[var(--negative)]" : ""}`}>
+            {formatBRL(totalBalance)}
+          </p>
+        </Link>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[var(--border)] pt-4 sm:gap-6">
+        <div>
           <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Recebido no mês</p>
           <p className="mt-1 text-[15px] font-semibold tnum">{formatBRL(income)}</p>
         </div>
-
-        <div className="lg:border-l lg:border-[var(--border)] lg:pl-5">
+        <div>
           <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Sobrou no mês</p>
           <p
             className={`mt-1 text-[15px] font-semibold tnum ${
@@ -81,19 +95,6 @@ export function SpendWidget({
             {formatBRL(income - expense)}
           </p>
         </div>
-
-        <Link
-          href="/financas/contas"
-          aria-label="Ver saldo total e contas"
-          className="group -m-1 rounded-lg p-1 transition-colors hover:bg-[var(--card-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:border-l lg:border-[var(--border)] lg:pl-6"
-        >
-          <p className="flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-[var(--faint)] group-hover:text-[var(--muted-foreground)]">
-            Saldo total <ArrowUpRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
-          </p>
-          <p className={`mt-1 text-[15px] font-semibold tnum ${totalBalance < 0 ? "text-[var(--negative)]" : ""}`}>
-            {formatBRL(totalBalance)}
-          </p>
-        </Link>
       </div>
 
       {hasData ? (
