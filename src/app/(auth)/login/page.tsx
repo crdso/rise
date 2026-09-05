@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { setDemoSession } from "@/lib/auth/demo";
+import { getDemoSession, setDemoSession } from "@/lib/auth/demo";
 import { RiseMark, RiseLogo } from "@/components/rise/RiseMark";
 import { SpotlightSurface } from "@/components/rise/SpotlightSurface";
 import { LoginSuccess } from "@/components/rise/LoginSuccess";
@@ -20,9 +20,53 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
   const demoMode = !isSupabaseConfigured();
   const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    let active = true;
+
+    if (demoMode) {
+      const session = getDemoSession();
+      if (session) {
+        // Restores the demo cookie used by the request proxy for older sessions.
+        setDemoSession(session.email);
+        router.replace("/");
+      } else {
+        setCheckingAuth(false);
+      }
+      return () => { active = false; };
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      setCheckingAuth(false);
+      return () => { active = false; };
+    }
+
+    const timeout = setTimeout(() => {
+      if (active) setCheckingAuth(false);
+    }, 6_000);
+
+    void supabase.auth.getClaims().then(({ data, error: claimsError }) => {
+      if (!active) return;
+      clearTimeout(timeout);
+      if (!claimsError && data?.claims?.sub) router.replace("/");
+      else setCheckingAuth(false);
+    }).catch(() => {
+      if (active) {
+        clearTimeout(timeout);
+        setCheckingAuth(false);
+      }
+    });
+
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [demoMode, router]);
 
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +89,7 @@ export default function LoginPage() {
       }
       setSuccess(true);
       // tempo da animação de conclusão antes de trocar de tela
-      setTimeout(() => router.push("/"), reduced ? 320 : 1000);
+      setTimeout(() => router.replace("/"), reduced ? 320 : 1000);
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : "Falha ao entrar";
       const msg = /invalid login credentials/i.test(raw)
@@ -62,6 +106,10 @@ export default function LoginPage() {
   const drift2 = reduced
     ? {}
     : { animate: { x: [0, -28, 0], y: [0, 16, 0] }, transition: { duration: 27, repeat: Infinity, ease: "easeInOut" as const } };
+
+  if (checkingAuth) {
+    return <div className="min-h-[100dvh] bg-[var(--background)]" aria-label="Verificando acesso" />;
+  }
 
   return (
     <div className="relative min-h-[100dvh] bg-[var(--background)] overflow-hidden">

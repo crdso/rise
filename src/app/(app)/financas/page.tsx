@@ -426,7 +426,7 @@ export default function FinancasPage() {
               </Button>
               <Button
                 size="sm"
-                className="rounded-full bg-[var(--negative)] hover:brightness-110 text-white"
+                className="rounded-full bg-[var(--negative)] hover:brightness-110 text-[var(--negative-foreground)]"
                 onClick={async () => {
                   try {
                     await financeService.deleteTransaction(confirmId);

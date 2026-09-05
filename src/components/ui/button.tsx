@@ -9,7 +9,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-[var(--accent)] text-[var(--accent-foreground)] hover:bg-[var(--accent-strong)] shadow-[0_8px_20px_var(--glow)] hover:shadow-[0_10px_28px_var(--glow)] hover:-translate-y-[1px] active:translate-y-0 active:scale-[0.98]",
         ghost: "bg-transparent text-[var(--muted-foreground)] hover:bg-[var(--card-soft)] hover:text-[var(--foreground)]",
-        soft: "bg-[var(--accent-soft)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white border border-transparent",
+        soft: "bg-[var(--accent-soft)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)] border border-transparent",
         outline: "bg-transparent border border-[var(--border-strong)] text-[var(--foreground)] hover:bg-[var(--card-soft)]",
         muted: "bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] hover:border-[var(--border-strong)] shadow-sm",
       },

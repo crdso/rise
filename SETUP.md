@@ -72,21 +72,25 @@ Em **Project Settings → API**:
 | Onde aparece | Vai para | É segredo? |
 |---|---|---|
 | Project URL | `NEXT_PUBLIC_SUPABASE_URL` | Não |
-| `anon` `public` | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Não (é pública por design; quem protege é a RLS) |
-| `service_role` `secret` | `SUPABASE_SERVICE_ROLE_KEY` | **SIM — nunca no navegador** |
+| Publishable key | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Não (é pública por design; quem protege é a RLS) |
+| Secret key | `SUPABASE_SECRET_KEY` | **SIM — nunca no navegador** |
 
 Crie `.env.local` na raiz do projeto:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://SEU_PROJETO.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=SEU_VALOR_AQUI
-SUPABASE_SERVICE_ROLE_KEY=SEU_VALOR_AQUI
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=SEU_VALOR_AQUI
+SUPABASE_SECRET_KEY=SEU_VALOR_AQUI
 NEXT_PUBLIC_APP_URL=http://localhost:5173
 ```
 
-> A `service_role` ignora a RLS. Ela só é lida por código de servidor
+> A chave secreta ignora a RLS. Ela só é lida por código de servidor
 > (`src/lib/supabase/admin.ts`). Se ela aparecer em qualquer variável começando
 > com `NEXT_PUBLIC_`, está errado.
+
+> Em projetos legados, o RISE aceita temporariamente
+> `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` como fallback.
+> Em novos projetos, use somente as chaves publishable e secret acima.
 
 ### 3.3 Aplicar as migrations
 
@@ -235,8 +239,8 @@ desatualizado só atrapalharia.
    | Variável | Valor |
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | a mesma do `.env.local` |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | a mesma do `.env.local` |
-   | `SUPABASE_SERVICE_ROLE_KEY` | a mesma — marque como secreta |
+    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | a mesma do `.env.local` |
+    | `SUPABASE_SECRET_KEY` | a mesma — marque como secreta |
    | `BRANDFETCH_SECRET_API_KEY` | se usar — marque como secreta |
    | `NEXT_PUBLIC_LOGO_DEV_TOKEN` | se usar |
    | `NEXT_PUBLIC_APP_URL` | `https://SEU-SITE.netlify.app` |
@@ -299,8 +303,8 @@ validar as safe areas.
 | Variável | Segredo? | Onde é lida |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | não | navegador + servidor |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | não | navegador + servidor |
-| `SUPABASE_SERVICE_ROLE_KEY` | **sim** | apenas servidor |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | não | navegador + servidor |
+| `SUPABASE_SECRET_KEY` | **sim** | apenas servidor |
 | `BRANDFETCH_SECRET_API_KEY` | **sim** | apenas servidor |
 | `NEXT_PUBLIC_LOGO_DEV_TOKEN` | não | navegador |
 | `OPENAI_API_KEY` / `GEMINI_API_KEY` | **sim** | apenas servidor |
@@ -310,6 +314,9 @@ validar as safe areas.
 A regra é o prefixo: **tudo que começa com `NEXT_PUBLIC_` vai para o navegador
 e é visível para qualquer pessoa.** Se um valor não pode ser visto, ele não
 pode ter esse prefixo.
+
+> Os nomes legados `NEXT_PUBLIC_SUPABASE_ANON_KEY` e
+> `SUPABASE_SERVICE_ROLE_KEY` são aceitos apenas como fallback temporário.
 
 ### Uma observação sobre "Importantes"
 

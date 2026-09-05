@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { debtSchema } from "@/lib/validators/debt";
 import type { Debt } from "@/types/debt";
 
-export function DebtDialog({ open, onClose, onSave, initial }: { open: boolean; onClose: () => void; onSave: (data: { person: string; description?: string | null; kind: "owed" | "receivable"; amount: number; due_date?: string | null; notes?: string | null; is_installment?: boolean; installments_count?: number | null; first_due_date?: string | null }) => Promise<void>; initial?: Debt | null }) {
+export function DebtDialog({ open, onClose, onSave, initial, draft }: { open: boolean; onClose: () => void; onSave: (data: { person: string; description?: string | null; kind: "owed" | "receivable"; amount: number; due_date?: string | null; notes?: string | null; is_installment?: boolean; installments_count?: number | null; first_due_date?: string | null }) => Promise<void>; initial?: Debt | null; draft?: { person?: string; description?: string | null; kind?: "owed" | "receivable"; amount?: number; due_date?: string | null; notes?: string | null } }) {
   const [person, setPerson] = useState("");
   const [desc, setDesc] = useState("");
   const [kind, setKind] = useState<"owed" | "receivable">("owed");
@@ -27,11 +27,11 @@ export function DebtDialog({ open, onClose, onSave, initial }: { open: boolean; 
       if (initial) {
         setPerson(initial.person); setDesc(initial.description||""); setKind(initial.kind); setAmount(String(initial.amount).replace(".",",")); setDue(initial.due_date||""); setNotes(initial.notes||""); setIsParc(!!initial.is_installment); setCount(String(initial.installments_count||4)); setFirstDue(initial.due_date||"");
       } else {
-        setPerson(""); setDesc(""); setKind("owed"); setAmount(""); setDue(""); setNotes(""); setIsParc(false); setCount("4"); setFirstDue("");
+        setPerson(draft?.person || ""); setDesc(draft?.description || ""); setKind(draft?.kind || "owed"); setAmount(draft?.amount ? String(draft.amount).replace(".", ",") : ""); setDue(draft?.due_date || ""); setNotes(draft?.notes || ""); setIsParc(false); setCount("4"); setFirstDue("");
       }
       setErr(""); setPreview(null);
     }
-  }, [open, initial]);
+  }, [open, initial, draft]);
 
   useEffect(() => {
     if (!isParc || !amount || !count || !firstDue) { setPreview(null); return; }
@@ -88,8 +88,8 @@ export function DebtDialog({ open, onClose, onSave, initial }: { open: boolean; 
 
             <div className="mt-4 grid gap-3">
               <div className="flex gap-2">
-                <button onClick={()=>setKind("owed")} className={`flex-1 h-9 rounded-full text-xs font-semibold border ${kind==="owed"?"bg-[var(--accent)] text-white border-transparent":"bg-[var(--card-soft)] border-[var(--border)]"}`}>Eu devo</button>
-                <button onClick={()=>setKind("receivable")} className={`flex-1 h-9 rounded-full text-xs font-semibold border ${kind==="receivable"?"bg-emerald-500 text-white border-transparent":"bg-[var(--card-soft)] border-[var(--border)]"}`}>Me devem</button>
+                <button onClick={()=>setKind("owed")} className={`flex-1 h-9 rounded-full text-xs font-semibold border ${kind==="owed"?"bg-[var(--accent)] text-[var(--accent-foreground)] border-transparent":"bg-[var(--card-soft)] border-[var(--border)]"}`}>Eu devo</button>
+                <button onClick={()=>setKind("receivable")} className={`flex-1 h-9 rounded-full text-xs font-semibold border ${kind==="receivable"?"bg-[var(--positive)] text-[var(--positive-foreground)] border-transparent":"bg-[var(--card-soft)] border-[var(--border)]"}`}>Me devem</button>
               </div>
 
               <div>

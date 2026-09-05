@@ -1,10 +1,11 @@
 "use client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const KEY = "rise_demo_session";
 const COOKIE = "rise_demo";
 
 export function isDemoMode() {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return !isSupabaseConfigured();
 }
 
 export function getDemoSession(): { email: string } | null {

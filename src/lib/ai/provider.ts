@@ -1,6 +1,6 @@
-import type { ParsedIntent } from "./types";
+import type { ParseContext, ParsedIntent } from "./types";
 
 export interface AIProvider {
-  name: string;
-  parse(input: string): Promise<ParsedIntent>;
+  name: "openai" | "mock";
+  parse(input: string, context: ParseContext): Promise<ParsedIntent>;
 }

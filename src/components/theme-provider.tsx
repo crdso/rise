@@ -110,8 +110,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (cancelled || !remote) return;
       const root = document.documentElement;
 
+      let resolvedTheme = initial;
       if (remote.theme && (remote.theme === "custom" || isPresetTheme(remote.theme))) {
         const t = remote.theme as ThemeId;
+        resolvedTheme = t;
         setThemeState(t);
         root.setAttribute("data-theme", t);
         try { localStorage.setItem(K_THEME, t); } catch {}
@@ -123,17 +125,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       };
       setCustomState(nextCustom);
       applyAmbient(nextCustom.intensity);
-      if ((remote.theme ?? initial) === "custom") applyCustomVars(nextCustom);
+      if (resolvedTheme === "custom") applyCustomVars(nextCustom);
+      else applyCustomVars(null);
       try { localStorage.setItem(K_CUSTOM, JSON.stringify(nextCustom)); } catch {}
 
       if (typeof remote.reduced_motion === "boolean") {
         setReducedMotionState(remote.reduced_motion);
         if (remote.reduced_motion) root.setAttribute("data-motion", "reduced");
         else root.removeAttribute("data-motion");
+        try { localStorage.setItem(K_MOTION, remote.reduced_motion ? "1" : "0"); } catch {}
       }
       if (remote.density) {
         setDensityState(remote.density);
         root.setAttribute("data-density", remote.density);
+        try { localStorage.setItem(K_DENSITY, remote.density); } catch {}
       }
       if (remote.dashboard?.order) {
         const d = useDashboardStore.getState();

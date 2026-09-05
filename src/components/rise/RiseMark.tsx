@@ -29,7 +29,7 @@ export function RiseMark({ size = 24, className }: { size?: number; className?: 
 export function RiseBadge({ size = 32, className }: { size?: number; className?: string }) {
   return (
     <div
-      className={`shrink-0 rounded-full bg-[#08090C] text-white grid place-items-center border border-white/10 ${className || ""}`}
+      className={`shrink-0 rounded-full bg-[var(--sidebar)] text-[var(--foreground)] grid place-items-center border border-[var(--border-strong)] ${className || ""}`}
       style={{ width: size, height: size }}
     >
       <RiseMark size={Math.round(size * 0.5)} />

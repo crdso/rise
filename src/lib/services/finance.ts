@@ -100,6 +100,18 @@ export const financeService = {
     useFinanceStore.getState().upsertTransaction(created);
     return created;
   },
+  async confirmTransactionWithAccount(data: Omit<Transaction, "id" | "created_at" | "updated_at"> & { account_name: string; account_color?: string | null; account_brand_domain?: string | null; account_brand_key?: string | null; category_name?: string | null }, idempotencyKey: string) {
+    if (!isSupabaseConfigured()) {
+      const account = demoCreateAccount({ name: data.account_name, type: "checking", color: data.account_color || null, brand_domain: data.account_brand_domain || null, brand_key: data.account_brand_key || null, initial_balance: 0, is_active: true });
+      const transaction = await this.createTransaction({ ...data, account_id: account.id });
+      return { account, transaction, category: null };
+    }
+    const result = await api<{ account: Account; transaction: Transaction; category: Category | null }>("/api/transactions/ensure-account", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ ...data, account_type: "checking" }) });
+    useFinanceStore.getState().upsertAccount(result.account);
+    useFinanceStore.getState().upsertTransaction(result.transaction);
+    if (result.category) useFinanceStore.getState().upsertCategory(result.category);
+    return result;
+  },
   async updateTransaction(id: string, patch: Partial<Transaction>): Promise<Transaction | null> {
     if (!isSupabaseConfigured()) {
       const s = useFinanceStore.getState();

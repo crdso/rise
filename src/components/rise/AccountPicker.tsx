@@ -17,12 +17,14 @@ export function AccountPicker({
   onChange,
   allowNone = true,
   label = "Conta",
+  emptyMessage = "Nenhuma conta ativa cadastrada.",
 }: {
   accounts: Account[];
   value: string;
   onChange: (id: string) => void;
   allowNone?: boolean;
   label?: string;
+  emptyMessage?: string | null;
 }) {
   const list = accounts.filter((a) => a.is_active);
 
@@ -80,8 +82,8 @@ export function AccountPicker({
           );
         })}
 
-        {list.length === 0 && (
-          <p className="text-[12.5px] text-[var(--muted-foreground)] py-2">Nenhuma conta ativa cadastrada.</p>
+        {list.length === 0 && emptyMessage && (
+          <p className="text-[12.5px] text-[var(--muted-foreground)] py-2">{emptyMessage}</p>
         )}
       </div>
     </div>

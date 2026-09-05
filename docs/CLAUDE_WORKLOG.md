@@ -7,13 +7,8 @@ lê `CLAUDE.md`, `AGENTS.md` e este arquivo, e retoma pelo `CURRENT` / `NEXT`.
 
 ## STATUS
 
-`READY_FOR_BUILD` — lote de revisão de produto (visual + funcional) concluído
-e revisado. `.claude-done` criado.
-
-Significado, conforme o protocolo em `CLAUDE.md`: as alterações terminaram e o
-lote está pronto para **validação automática**. Não significa que o build já
-tenha sido executado — quem roda `npm run build` é o watcher local, e o
-`git add/commit/push` só acontece se o build passar.
+`VALIDATING` — OpenCode revisa o lote, executa a validação e conclui o commit e
+push diretamente. Não há watcher de commit nem arquivo de sinalização.
 
 ---
 
@@ -229,7 +224,7 @@ Nada em andamento. Lote fechado.
 
 Nenhuma migration antiga (001–009) foi editada.
 
-## VERIFICAÇÃO FEITA (sem shell no notebook)
+## VERIFICAÇÃO HISTÓRICA
 
 - parse com esbuild de **todos** os 129 arquivos `.ts`/`.tsx` de `src/` — ok
 - resolução programática de imports/exports (`@/` e relativos) — ok
@@ -242,10 +237,8 @@ Nenhuma migration antiga (001–009) foi editada.
 
 ## RISCOS / PENDÊNCIAS
 
-- `npm run build`, `tsc --noEmit` e `next lint` **não foram executados** —
-  não há shell no notebook. Quem roda o build é o watcher local, e o commit só
-  acontece se ele passar. Se falhar, o erro mais provável é tipagem estrita em
-  arquivo novo.
+- Cada lote deve executar `tsc --noEmit` e `npm run build` antes de commit e
+  push. Falhas devem ser corrigidas no próprio lote.
 - As migrations 012–014 **precisam ser aplicadas** antes de usar Configurações
   (persistência no servidor), Importantes e Escola em modo Supabase. Em modo
   Demo tudo funciona sem banco.
@@ -254,9 +247,9 @@ Nenhuma migration antiga (001–009) foi editada.
 - Twilio/WhatsApp: variáveis existem, implementação não.
 - Repositório já esteve público: trocar para privado e rotacionar chaves.
 
-## A REMOVER COM `git rm` (não consigo apagar arquivo pela ponte)
+## LIMPEZA OPCIONAL
 
 - `src/components/rise/Agenda.tsx` — substituído pelos widgets do painel.
   Confirmado sem nenhum import no projeto: é código morto.
-- `.preflight/` — pasta de verificação manual, redundante agora que o watcher
-  roda o build.
+- `.preflight/` — pasta de verificação manual, redundante agora que OpenCode
+  executa a validação diretamente.

@@ -36,6 +36,7 @@ import {
   monthStats,
   pctChange,
   previousMonthKey,
+  totalBalance,
 } from "@/lib/finance/analytics";
 import { saoPauloDateKey, saoPauloTodayKey, addDaysToDateKey } from "@/lib/timezone";
 
@@ -80,9 +81,11 @@ export default function Dashboard() {
       slices,
       categoryTotal: total,
       topCategory: slices[0]?.name ?? null,
+      totalBalance: totalBalance(accounts, transactions),
+      activeAccounts: accounts.filter((account) => account.is_active).length,
       hasData: transactions.length > 0,
     };
-  }, [transactions, categories, monthKey]);
+  }, [accounts, transactions, categories, monthKey]);
 
   const todayEntries = useMemo<AgendaEntry[]>(() => {
     const evs: AgendaEntry[] = events
@@ -212,7 +215,15 @@ export default function Dashboard() {
           />
         );
       case "accounts":
-        return <AccountsWidget accounts={accounts} transactions={transactions} balanceOf={accountBalance} />;
+        return (
+          <AccountsWidget
+            accounts={accounts}
+            transactions={transactions}
+            balanceOf={accountBalance}
+            totalBalance={finance.totalBalance}
+            activeAccounts={finance.activeAccounts}
+          />
+        );
       case "important":
         return <ImportantWidget items={pinnedItems(importantItems)} />;
       case "school":

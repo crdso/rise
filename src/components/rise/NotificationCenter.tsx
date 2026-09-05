@@ -164,7 +164,7 @@ export function NotificationCenter() {
       >
         <Bell className="h-4 w-4" />
         {unread.length > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-[var(--negative)] text-white text-[10px] font-bold grid place-items-center tnum">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-[var(--negative)] text-[var(--negative-foreground)] text-[10px] font-bold grid place-items-center tnum">
             {unread.length > 9 ? "9+" : unread.length}
           </span>
         )}

@@ -36,8 +36,8 @@ export async function POST(req: Request) {
   });
 
   if (error) {
-    // inclui caso service role ausente configurado na função
-    const msg = error.message.includes("service_role") || error.message.includes("SUPABASE") ? "Erro de configuração: SUPABASE_SERVICE_ROLE_KEY ausente" : error.message;
+    // Inclui falhas de configuração da chave administrativa usada pela auditoria.
+    const msg = error.message.includes("service_role") || error.message.includes("SUPABASE") ? "Erro de configuração: SUPABASE_SECRET_KEY ausente" : error.message;
     return NextResponse.json({ error: msg }, { status: 500 });
   }
   return NextResponse.json({ data });

@@ -16,12 +16,14 @@ export function ReminderDialog({
   onClose,
   onSave,
   initial,
+  draft,
 }: {
   open: boolean;
   onClose: () => void;
   /** Deve REJEITAR em caso de falha: o dialog só fecha após sucesso. */
   onSave: (data: ReminderInput) => Promise<void>;
   initial?: Reminder | null;
+  draft?: Partial<ReminderInput>;
 }) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -40,14 +42,14 @@ export function ReminderDialog({
       setPriority(initial.priority);
       setRecurrence(initial.recurrence || "none");
     } else {
-      setTitle("");
-      setNotes("");
-      setDue("");
-      setPriority("medium");
-      setRecurrence("none");
+      setTitle(draft?.title || "");
+      setNotes(draft?.notes || "");
+      setDue(draft?.due_at ? toSaoPauloDateTimeLocal(draft.due_at) : "");
+      setPriority(draft?.priority || "medium");
+      setRecurrence(draft?.recurrence || "none");
     }
     setErr("");
-  }, [open, initial]);
+  }, [open, initial, draft]);
 
   const submit = async () => {
     if (loading) return; // impede duplo clique / duplo submit

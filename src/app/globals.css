@@ -40,6 +40,10 @@ html {
 
   /* intensidade do gradiente ambiental (0.3 – 1.4), ajustável em Configurações */
   --ambient-intensity: 1;
+  --scrim: rgba(0,0,0,0.52);
+  --positive-foreground: #06160C;
+  --negative-foreground: #1B090B;
+  --warning-foreground: #1C1300;
 }
 
 html, body { transition: var(--transition-theme); }
@@ -352,6 +356,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
+
+input[type="color"] { color-scheme: dark; }
 
 ::selection { background: var(--selection); color: var(--foreground); }
 

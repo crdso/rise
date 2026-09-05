@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Plus, Minus, RotateCcw } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { ThemePreview } from "@/components/rise/ThemeSwitcher";
-import { CUSTOM_MAX_COLORS, CUSTOM_MIN_COLORS, DEFAULT_CUSTOM, type CustomTheme } from "@/lib/themes";
+import { buildCustomTheme, CUSTOM_MAX_COLORS, CUSTOM_MIN_COLORS, DEFAULT_CUSTOM, type CustomTheme } from "@/lib/themes";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -50,12 +50,8 @@ export function CustomThemeEditor() {
     commit({ ...draft, colors: draft.colors.slice(0, -1) });
   };
 
-  const preview: [string, string, string, string] = [
-    "#08090C",
-    "#12141A",
-    draft.colors[0] || DEFAULT_CUSTOM.colors[0],
-    draft.colors[1] || draft.colors[0] || DEFAULT_CUSTOM.colors[1],
-  ];
+  const previewTokens = buildCustomTheme(draft);
+  const preview: [string, string, string, string] = [previewTokens["--background"], previewTokens["--sidebar"], previewTokens["--card"], previewTokens["--accent"]];
 
   return (
     <div className="space-y-4">

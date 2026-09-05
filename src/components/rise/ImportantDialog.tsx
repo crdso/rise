@@ -13,6 +13,7 @@ export function ImportantDialog({
   onSave,
   initial,
   suggestedTags = [],
+  draft,
 }: {
   open: boolean;
   onClose: () => void;
@@ -20,6 +21,7 @@ export function ImportantDialog({
   onSave: (data: ImportantInput) => Promise<void>;
   initial?: ImportantItem | null;
   suggestedTags?: string[];
+  draft?: Partial<ImportantInput>;
 }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -38,14 +40,14 @@ export function ImportantDialog({
       setPinned(initial.pinned);
       setRemind(initial.remind_at ? toSaoPauloDateTimeLocal(initial.remind_at) : "");
     } else {
-      setTitle("");
-      setContent("");
-      setTag("");
-      setPinned(false);
-      setRemind("");
+      setTitle(draft?.title || "");
+      setContent(draft?.content || "");
+      setTag(draft?.tag || "");
+      setPinned(!!draft?.pinned);
+      setRemind(draft?.remind_at ? toSaoPauloDateTimeLocal(draft.remind_at) : "");
     }
     setErr("");
-  }, [open, initial]);
+  }, [open, initial, draft]);
 
   const submit = async () => {
     if (loading) return;

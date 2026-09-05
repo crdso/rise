@@ -12,8 +12,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 export async function GET() {
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
-    const { data } = (await supabase?.auth.getUser()) ?? { data: { user: null } };
-    if (!data?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data } = (await supabase?.auth.getClaims()) ?? { data: { claims: null } };
+    if (!data?.claims?.sub) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const has = (v?: string) => !!v && v.trim().length > 0;
@@ -21,7 +21,7 @@ export async function GET() {
   return NextResponse.json({
     data: {
       supabase: isSupabaseConfigured(),
-      supabaseServiceRole: has(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      supabaseSecretKey: has(process.env.SUPABASE_SECRET_KEY) || has(process.env.SUPABASE_SERVICE_ROLE_KEY),
       brandfetch: has(process.env.BRANDFETCH_SECRET_API_KEY),
       logodev: has(process.env.NEXT_PUBLIC_LOGO_DEV_TOKEN),
       openai: has(process.env.OPENAI_API_KEY),

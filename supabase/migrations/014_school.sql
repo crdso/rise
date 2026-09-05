@@ -192,6 +192,10 @@ grant execute on function public.update_school_task_with_audit(uuid,jsonb) to au
 -- já arquivados a cada execução, então rodar a função duas vezes duplicava os
 -- registros. Agora só audita o que foi arquivado nesta chamada.
 -- ============================================================
+-- A 001 declarava esta assinatura com RETURNS void. PostgreSQL não permite
+-- trocar o tipo de retorno via CREATE OR REPLACE, então remove a versão antiga.
+drop function if exists public.archive_school_workspaces_if_due();
+
 create or replace function public.archive_school_workspaces_if_due()
 returns integer
 language plpgsql

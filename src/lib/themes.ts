@@ -21,7 +21,7 @@ export type ThemeId = PresetThemeId | "custom";
 export type ThemeMeta = {
   label: string;
   desc: string;
-  /** cores do mini-preview do seletor: [fundo, surface, acento, acento secundário] */
+  /** cores do mini-preview: [fundo, sidebar, card, acento] */
   preview: [string, string, string, string];
 };
 
@@ -29,42 +29,42 @@ export const THEMES: Record<PresetThemeId, ThemeMeta> = {
   onyx: {
     label: "Onyx",
     desc: "Grafite quase preto",
-    preview: ["#08090B", "#101317", "#D3D9E2", "#8FA0B8"],
+    preview: ["#08090B", "#0A0C0F", "#101317", "#D3D9E2"],
   },
   blurple: {
     label: "Midnight Blurple",
     desc: "Navy profundo + blurple",
-    preview: ["#080913", "#121424", "#5865F2", "#8B93F8"],
+    preview: ["#080913", "#0A0C18", "#121424", "#5865F2"],
   },
   ocean: {
     label: "Deep Ocean",
     desc: "Navy + ciano profundo",
-    preview: ["#041016", "#0A2130", "#22B8CF", "#3B82F6"],
+    preview: ["#041016", "#05141C", "#0A2130", "#22B8CF"],
   },
   forest: {
     label: "Forest",
     desc: "Verde floresta profundo",
-    preview: ["#060B08", "#0E1A13", "#3DA35D", "#A3C46A"],
+    preview: ["#060B08", "#070F0A", "#0E1A13", "#3DA35D"],
   },
   emerald: {
     label: "Emerald Night",
     desc: "Preto-esverdeado + esmeralda",
-    preview: ["#030A07", "#0A1B13", "#10B981", "#2DD4BF"],
+    preview: ["#030A07", "#040E09", "#0A1B13", "#10B981"],
   },
   amethyst: {
     label: "Amethyst",
     desc: "Charcoal + roxo sofisticado",
-    preview: ["#0A090F", "#16141F", "#8B5CF6", "#EC4899"],
+    preview: ["#0A090F", "#0C0A13", "#16141F", "#8B5CF6"],
   },
   crimson: {
     label: "Crimson Dusk",
     desc: "Vinho + vermelho discreto",
-    preview: ["#0C0709", "#1A0F13", "#E5484D", "#E8A33D"],
+    preview: ["#0C0709", "#0E080B", "#1A0F13", "#E5484D"],
   },
   chroma: {
     label: "Chroma Night",
     desc: "Neutro + ambiente multicolor",
-    preview: ["#090A0E", "#14161C", "#7C8CF8", "#22C5C2"],
+    preview: ["#090A0E", "#0B0C11", "#14161C", "#7C8CF8"],
   },
 };
 

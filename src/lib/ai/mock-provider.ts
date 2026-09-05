@@ -1,38 +1,21 @@
 import type { AIProvider } from "./provider";
-import type { ParsedIntent } from "./types";
+import type { ParseContext, ParsedIntent } from "./types";
 
 export class MockAIProvider implements AIProvider {
-  name = "mock";
-  async parse(input: string): Promise<ParsedIntent> {
+  name = "mock" as const;
+
+  async parse(input: string, context: ParseContext): Promise<ParsedIntent> {
     const lower = input.toLowerCase();
     const amountMatch = lower.match(/(\d+[.,]?\d*)/);
-    const amount = amountMatch ? parseFloat(amountMatch[1].replace(",", ".")) : undefined;
-    // simple heuristics
-    if (lower.includes("gastei") || lower.includes("paguei") || lower.includes("comprei") || lower.includes("gasto")) {
-      return {
-        type: "expense",
-        confidence: 0.86,
-        amount,
-        category: lower.includes("mercado") ? "Mercado" : lower.includes("lanche") ? "Alimentação" : "Outros",
-        account: lower.includes("nubank") ? "Nubank" : lower.includes("inter") ? "Inter" : undefined,
-        description: input,
-        date: new Date().toISOString(),
-        raw: input,
-      };
-    }
-    if (lower.includes("recebi") || lower.includes("receber")) {
-      return { type: "income", confidence: 0.8, amount, description: input, date: new Date().toISOString(), raw: input };
-    }
-    if (lower.includes("prova") || lower.includes("trabalho") || lower.includes("atividade")) {
-      return { type: "school_task", confidence: 0.78, title: input.slice(0, 60), description: input, date: new Date().toISOString(), raw: input };
-    }
-    if (lower.includes("lembra") || lower.includes("lembrete")) {
-      const amb = lower.includes("pagar") && lower.includes("pro ");
-      return { type: "reminder", confidence: amb ? 0.55 : 0.82, title: input.slice(0, 60), ambiguous: amb, alternatives: amb ? ["debt_owed", "reminder"] : undefined, raw: input };
-    }
-    if (lower.includes("devo") || lower.includes("dever")) {
-      return { type: "debt_owed", confidence: 0.75, amount, person: "João", raw: input };
-    }
-    return { type: "note", confidence: 0.6, description: input, raw: input };
+    const amount = amountMatch ? Number(amountMatch[1].replace(",", ".")) : null;
+    const today = context.now;
+
+    if (/(gastei|paguei|comprei)/.test(lower)) return { intent: "transaction", confidence: 0.72, missingFields: amount ? [] : ["amount"], clarification: null, data: { type: "expense", amount, description: input, occurredAt: lower.includes("hoje") ? today : null, account: null, category: lower.includes("almoç") || lower.includes("lanche") ? "Alimentação" : null, paymentMethod: null, notes: null } };
+    if (/(recebi|receber)/.test(lower)) return { intent: "transaction", confidence: 0.7, missingFields: amount ? [] : ["amount"], clarification: null, data: { type: "income", amount, description: input, occurredAt: null, account: null, category: null, paymentMethod: null, notes: null } };
+    if (/(lembra|lembrete)/.test(lower)) return { intent: "reminder", confidence: 0.68, missingFields: [], clarification: null, data: { title: input, dueAt: null, notes: null, priority: "medium", recurrence: "none" } };
+    if (/(prova|trabalho|atividade)/.test(lower)) return { intent: "school_task", confidence: 0.68, missingFields: [], clarification: null, data: { title: input, subject: null, description: null, type: lower.includes("prova") ? "exam" : "homework", priority: "medium", dueAt: null } };
+    if (/(devo|dever)/.test(lower)) return { intent: "debt", confidence: 0.65, missingFields: amount ? ["person"] : ["amount", "person"], clarification: "Confirme a pessoa e o valor antes de salvar.", data: { kind: "owed", person: null, amount, description: null, dueDate: null, notes: null } };
+    if (/(anota|anote|lembrar)/.test(lower)) return { intent: "important", confidence: 0.6, missingFields: [], clarification: null, data: { title: input, content: null, tag: null, pinned: false, remindAt: null } };
+    return { intent: "unknown", confidence: 0.3, missingFields: [], clarification: "Não entendi o que você quer adicionar. Tente mencionar um gasto, lembrete, evento, dívida ou anotação.", data: {} };
   }
 }

@@ -119,7 +119,7 @@ export default function LembretesPage() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${tab === t.id ? "bg-[var(--accent)] text-white" : "text-[var(--muted-foreground)]"}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${tab === t.id ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted-foreground)]"}`}
               >
                 {t.label}
                 {count > 0 && <span className="ml-1.5 opacity-70">{count}</span>}

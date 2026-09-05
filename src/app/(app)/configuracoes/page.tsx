@@ -72,7 +72,7 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: typeof Palette }> = 
 
 type Integrations = {
   supabase: boolean;
-  supabaseServiceRole: boolean;
+  supabaseSecretKey: boolean;
   brandfetch: boolean;
   logodev: boolean;
   openai: boolean;
@@ -138,7 +138,15 @@ export default function ConfiguracoesPage() {
       clearDemoSession();
     } else {
       const supabase = createClient();
-      await supabase?.auth.signOut();
+      if (!supabase) {
+        push({ title: "Não foi possível encerrar a sessão" });
+        return;
+      }
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        push({ title: "Não foi possível encerrar a sessão" });
+        return;
+      }
     }
     router.replace("/login");
   };
@@ -187,16 +195,19 @@ export default function ConfiguracoesPage() {
                         key={id}
                         onClick={() => setTheme(id)}
                         aria-pressed={active}
-                        className={`rounded-xl border p-2 text-left transition-all ${
+                          className={`relative rounded-xl border p-2 text-left transition-all ${
                           active
                             ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                             : "border-[var(--border)] bg-[var(--card)] hover:border-[var(--border-strong)]"
                         }`}
                       >
-                        <ThemePreview preview={themes[id].preview} height={54} />
+                        <ThemePreview preview={themes[id].preview} height={70} />
+                        {active && <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] shadow-sm"><Check className="h-3 w-3" /></span>}
                         <div className="mt-2 flex items-center justify-between gap-1">
-                          <p className="text-[12px] font-semibold truncate">{themes[id].label}</p>
-                          {active && <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />}
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-semibold truncate">{themes[id].label}</p>
+                            <p className="mt-0.5 text-[10.5px] leading-tight text-[var(--muted-foreground)] truncate">{themes[id].desc}</p>
+                          </div>
                         </div>
                       </button>
                     );
@@ -406,9 +417,9 @@ export default function ConfiguracoesPage() {
                   control={<StatusPill ok={!!integrations?.supabase} okLabel="Conectado" offLabel="Modo demonstração" />}
                 />
                 <SettingsRow
-                  label="Service role"
-                  hint="Necessária apenas em rotinas administrativas do servidor"
-                  control={<StatusPill ok={!!integrations?.supabaseServiceRole} okLabel="Configurada" offLabel="Ausente" />}
+                  label="Chave secreta"
+                  hint="Necessária apenas em rotinas administrativas e auditoria no servidor"
+                  control={<StatusPill ok={!!integrations?.supabaseSecretKey} okLabel="Configurada" offLabel="Ausente" />}
                 />
                 <SettingsRow
                   label="Brandfetch"

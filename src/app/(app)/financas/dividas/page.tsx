@@ -90,7 +90,7 @@ export default function DividasPage() {
       <div className="flex flex-wrap gap-2 items-center">
         <div className="flex gap-1 p-1 rounded-full border border-[var(--border)] bg-[var(--card)] overflow-x-auto">
           {(["all","owed","receivable","pending","overdue","paid"] as const).map(f=>(
-            <button key={f} onClick={()=>setFilter(f)} className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${filter===f?"bg-[var(--accent)] text-white":"text-[var(--muted-foreground)]"}`}>{f==="all"?"Todas":f==="owed"?"Eu devo":f==="receivable"?"Me devem":f==="pending"?"Pendentes":f==="overdue"?"Atrasadas":"Pagas"}</button>
+            <button key={f} onClick={()=>setFilter(f)} className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${filter===f?"bg-[var(--accent)] text-[var(--accent-foreground)]":"text-[var(--muted-foreground)]"}`}>{f==="all"?"Todas":f==="owed"?"Eu devo":f==="receivable"?"Me devem":f==="pending"?"Pendentes":f==="overdue"?"Atrasadas":"Pagas"}</button>
           ))}
         </div>
         <div className="flex-1 min-w-[180px] relative">

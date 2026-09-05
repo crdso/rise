@@ -16,7 +16,7 @@ const CATS = [
   { id: "important", label: "Importante", color: "var(--negative)" },
 ];
 
-export function EventDialog({ open, onClose, onSave, initial, initialDate, initialTime }: { open: boolean; onClose: () => void; onSave: (data: Omit<CalendarEvent,"id"|"user_id"|"created_at"|"updated_at">) => Promise<void>; initial?: CalendarEvent | null; initialDate?: string | null; initialTime?: string | null }) {
+export function EventDialog({ open, onClose, onSave, initial, initialDate, initialTime, draft }: { open: boolean; onClose: () => void; onSave: (data: Omit<CalendarEvent,"id"|"user_id"|"created_at"|"updated_at">) => Promise<void>; initial?: CalendarEvent | null; initialDate?: string | null; initialTime?: string | null; draft?: Partial<Omit<CalendarEvent,"id"|"user_id"|"created_at"|"updated_at">> }) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [cat, setCat] = useState("personal");
@@ -34,18 +34,20 @@ export function EventDialog({ open, onClose, onSave, initial, initialDate, initi
         setEnd(initial.ends_at ? toSaoPauloDateTimeLocal(initial.ends_at) : "");
         setAllDay(initial.all_day);
       } else {
-        setTitle(""); setDesc(""); setCat("personal");
-        if (initialDate) {
+        setTitle(draft?.title || ""); setDesc(draft?.description || ""); setCat(draft?.category || "personal");
+        if (draft?.starts_at) {
+          setStart(toSaoPauloDateTimeLocal(draft.starts_at));
+        } else if (initialDate) {
           // dia clicado na grade; initialTime vem da faixa de hora da semana/dia
           setStart(`${initialDate}T${initialTime || "09:00"}`);
         } else {
           setStart(nowSaoPauloDateTimeLocal());
         }
-        setEnd(""); setAllDay(false);
+        setEnd(draft?.ends_at ? toSaoPauloDateTimeLocal(draft.ends_at) : ""); setAllDay(!!draft?.all_day);
       }
       setErr("");
     }
-  }, [open, initial, initialDate, initialTime]);
+  }, [open, initial, initialDate, initialTime, draft]);
 
   const submit = async () => {
     if (loading) return; // impede duplo clique / duplo submit

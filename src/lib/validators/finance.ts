@@ -46,6 +46,14 @@ export const transactionSchema = z.object({
   is_recurring: z.boolean().optional().default(false),
 });
 
+export const ensuredAccountTransactionSchema = transactionSchema.extend({
+  account_name: z.string().trim().min(2).max(40),
+  account_type: z.literal("checking").default("checking"),
+  account_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional(),
+  account_brand_domain: z.string().max(120).nullable().optional(),
+  account_brand_key: z.string().max(40).nullable().optional(),
+});
+
 export const transactionPatchSchema = z
   .object({ ...transactionFields, is_recurring: z.boolean().optional() })
   .partial()

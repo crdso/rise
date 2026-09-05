@@ -24,6 +24,7 @@ export function SchoolTaskDialog({
   onSave,
   initial,
   subjects = [],
+  draft,
 }: {
   open: boolean;
   onClose: () => void;
@@ -31,6 +32,7 @@ export function SchoolTaskDialog({
   onSave: (data: SchoolTaskInput) => Promise<void>;
   initial?: SchoolTask | null;
   subjects?: string[];
+  draft?: Partial<SchoolTaskInput>;
 }) {
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
@@ -51,15 +53,15 @@ export function SchoolTaskDialog({
       setPriority(initial.priority);
       setDue(initial.due_at ? toSaoPauloDateTimeLocal(initial.due_at) : "");
     } else {
-      setTitle("");
-      setSubject("");
-      setDescription("");
-      setType("homework");
-      setPriority("medium");
-      setDue("");
+      setTitle(draft?.title || "");
+      setSubject(draft?.subject || "");
+      setDescription(draft?.description || "");
+      setType(draft?.type || "homework");
+      setPriority(draft?.priority || "medium");
+      setDue(draft?.due_at ? toSaoPauloDateTimeLocal(draft.due_at) : "");
     }
     setErr("");
-  }, [open, initial]);
+  }, [open, initial, draft]);
 
   const submit = async () => {
     if (loading) return;

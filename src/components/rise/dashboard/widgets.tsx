@@ -68,11 +68,11 @@ export function SpendWidget({
 
         <div className="flex gap-6">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Recebido</p>
+            <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Recebido no mês</p>
             <p className="text-[15px] font-semibold tnum mt-1">{formatBRL(income)}</p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Sobrou</p>
+            <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Sobrou no mês</p>
             <p
               className={`text-[15px] font-semibold tnum mt-1 ${
                 income - expense < 0 ? "text-[var(--negative)]" : "text-[var(--positive)]"
@@ -282,42 +282,63 @@ export function AccountsWidget({
   accounts,
   transactions,
   balanceOf,
+  totalBalance,
+  activeAccounts,
 }: {
   accounts: Account[];
   transactions: Transaction[];
   balanceOf: (a: Account, t: Transaction[]) => number;
+  totalBalance: number;
+  activeAccounts: number;
 }) {
   const active = accounts.filter((a) => a.is_active);
-  if (!active.length) {
-    return (
-      <WidgetEmpty
-        action={
-          <Link
-            href="/financas/contas"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--card-soft)] px-3 py-1.5 text-[12px] font-medium hover:border-[var(--border-strong)]"
-          >
-            <Wallet className="h-3.5 w-3.5" /> Adicionar conta
-          </Link>
-        }
-      >
-        Nenhuma conta cadastrada.
-      </WidgetEmpty>
-    );
-  }
   return (
-    <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible">
-      {active.slice(0, 4).map((a) => (
-        <AccountTile
-          key={a.id}
-          name={a.name}
-          balance={balanceOf(a, transactions)}
-          color={a.color || "#6B7280"}
-          type={a.type}
-          brand_domain={a.brand_domain}
-          brand_key={a.brand_key}
-          fallback={a.name.slice(0, 2).toUpperCase()}
-        />
-      ))}
+    <div>
+      <Link
+        href="/financas/contas"
+        className="group mb-4 flex items-end justify-between gap-4 rounded-[16px] border border-[var(--border)] bg-[var(--card-soft)] px-4 py-3.5 transition-colors hover:border-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+        aria-label="Ver saldo total e contas"
+      >
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Saldo total</p>
+          <p className={`mt-1 text-[25px] font-semibold tracking-[-0.03em] leading-none tnum ${totalBalance < 0 ? "text-[var(--negative)]" : ""}`}>
+            {formatBRL(totalBalance)}
+          </p>
+        </div>
+        <span className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--muted-foreground)] group-hover:text-[var(--foreground)]">
+          {activeAccounts} {activeAccounts === 1 ? "conta ativa" : "contas ativas"} <ArrowUpRight className="h-3.5 w-3.5" />
+        </span>
+      </Link>
+
+      {active.length ? (
+        <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible">
+          {active.slice(0, 4).map((a) => (
+            <AccountTile
+              key={a.id}
+              name={a.name}
+              balance={balanceOf(a, transactions)}
+              color={a.color || "#6B7280"}
+              type={a.type}
+              brand_domain={a.brand_domain}
+              brand_key={a.brand_key}
+              fallback={a.name.slice(0, 2).toUpperCase()}
+            />
+          ))}
+        </div>
+      ) : (
+        <WidgetEmpty
+          action={
+            <Link
+              href="/financas/contas"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--card-soft)] px-3 py-1.5 text-[12px] font-medium hover:border-[var(--border-strong)]"
+            >
+              <Wallet className="h-3.5 w-3.5" /> Adicionar conta
+            </Link>
+          }
+        >
+          Nenhuma conta ativa cadastrada.
+        </WidgetEmpty>
+      )}
     </div>
   );
 }

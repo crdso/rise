@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Bell, Star, GraduationCap, FileClock, Settings } from "lucide-react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/rise/Sidebar";
 import { BottomNav } from "@/components/rise/BottomNav";
 import { HeaderBar } from "@/components/rise/HeaderBar";
@@ -22,6 +22,19 @@ import { reminderService } from "@/lib/services/reminderService";
 import { importantService } from "@/lib/services/importantService";
 import { schoolService } from "@/lib/services/schoolService";
 
+const INITIAL_SYNC_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs: number) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
+
 const MORE_LINKS: Array<{ href: "/lembretes" | "/importantes" | "/escola" | "/resumos" | "/configuracoes"; label: string; icon: typeof Bell }> = [
   { href: "/lembretes", label: "Lembretes", icon: Bell },
   { href: "/importantes", label: "Importantes", icon: Star },
@@ -30,12 +43,19 @@ const MORE_LINKS: Array<{ href: "/lembretes" | "/importantes" | "/escola" | "/re
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
+function clearSupabaseStores() {
+  useFinanceStore.getState().clearForSupabase();
+  useDebtStore.getState().clearForSupabase();
+  useCalendarStore.getState().clearForSupabase();
+  useReminderStore.getState().clearForSupabase();
+  useImportantStore.getState().clearForSupabase();
+  useSchoolStore.getState().clearForSupabase();
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [quick, setQuick] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [ready, setReady] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
   const demoMode = !isSupabaseConfigured();
 
   useEffect(() => {
@@ -49,74 +69,45 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  // Auth gate - inicia uma vez
+  // Proxy owns route authorization. This effect only keeps client stores in sync.
   useEffect(() => {
-    let cancelled = false;
-    let subscription: { unsubscribe: () => void } | null = null;
-    (async () => {
-      if (demoMode) {
-        const has = (() => {
-          try { return !!localStorage.getItem("rise_demo_session"); } catch { return false; }
-        })();
-        if (!has) router.replace("/login");
-        else if (!cancelled) setReady(true);
-        return;
-      }
-      const supabase = createClient();
-      if (!supabase) { router.replace("/login"); return; }
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        if (!cancelled) setReady(true);
-        router.replace("/login");
-        return;
-      }
-      // Supabase mode: sync inicial uma vez por sessão
-      try {
-        useFinanceStore.getState().clearForSupabase();
-        useDebtStore.getState().clearForSupabase();
-        useCalendarStore.getState().clearForSupabase();
-        useReminderStore.getState().clearForSupabase();
-        useImportantStore.getState().clearForSupabase();
-        useSchoolStore.getState().clearForSupabase();
-        await Promise.all([
-          financeService.refreshFromServer(),
-          debtService.refreshFromServer(),
-          calendarService.refreshFromServer(),
-          reminderService.refreshFromServer(),
-          importantService.refreshFromServer(),
-          schoolService.refreshFromServer(),
-        ]);
-      } catch (e) {
-        console.error("sync inicial falhou", e);
-      }
-      if (!cancelled) setReady(true);
-      const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    if (demoMode) return;
+
+    const supabase = createClient();
+    if (!supabase) return;
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
         if (event === "SIGNED_OUT") {
-          useFinanceStore.getState().clearForSupabase();
-          useDebtStore.getState().clearForSupabase();
-          useCalendarStore.getState().clearForSupabase();
-          useReminderStore.getState().clearForSupabase();
-          useImportantStore.getState().clearForSupabase();
-          useSchoolStore.getState().clearForSupabase();
+          clearSupabaseStores();
+          router.replace("/login");
+        }
+    });
+
+    clearSupabaseStores();
+
+    const modules = [
+      ["finance", () => financeService.refreshFromServer()],
+      ["debts", () => debtService.refreshFromServer()],
+      ["calendar", () => calendarService.refreshFromServer()],
+      ["reminders", () => reminderService.refreshFromServer()],
+      ["important", () => importantService.refreshFromServer()],
+      ["school", () => schoolService.refreshFromServer()],
+    ] as const;
+
+    void Promise.allSettled(
+      modules.map(([name, refresh]) => withTimeout(refresh(), `${name} initial sync`, INITIAL_SYNC_TIMEOUT_MS))
+    ).then((results) => {
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          console.error(`initial ${modules[index][0]} sync failed`, result.reason);
         }
       });
-      subscription = sub.subscription;
-    })();
-    return () => {
-      cancelled = true;
-      subscription?.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    });
 
-  if (!ready) {
-    // skeleton durante verificação, evita flash de conteúdo sem auth
-    return (
-      <div className="min-h-[100dvh] bg-[var(--background)] flex items-center justify-center">
-        <div className="h-5 w-5 rounded-full border-2 border-[var(--border-strong)] border-t-[var(--accent)] animate-spin" aria-label="Carregando" />
-      </div>
-    );
-  }
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, [demoMode, router]);
 
   return (
     <div className="min-h-[100dvh] flex bg-[var(--background)] text-[var(--foreground)]">

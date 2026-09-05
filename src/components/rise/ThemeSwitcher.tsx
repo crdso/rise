@@ -4,11 +4,11 @@ import { useTheme } from "@/components/theme-provider";
 import { Palette, X, Check, Sliders } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import type { PresetThemeId, ThemeMeta } from "@/lib/themes";
+import { buildCustomTheme, type PresetThemeId, type ThemeMeta } from "@/lib/themes";
 
 /**
  * Mini-preview de um tema: reproduz em miniatura a estrutura real do app
- * (sidebar + superfície + acento + ambiente), então dá para escolher olhando,
+ * (sidebar + navegação + conteúdo + card + acento), então dá para escolher olhando,
  * sem precisar aplicar para descobrir.
  */
 export function ThemePreview({
@@ -20,36 +20,39 @@ export function ThemePreview({
   className?: string;
   height?: number;
 }) {
-  const [bg, surface, accent, secondary] = preview;
+  const [background, sidebar, card, accent] = preview;
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-lg border border-white/10 ${className || ""}`}
-      style={{ height, background: bg }}
+      className={`relative w-full overflow-hidden rounded-lg ${className || ""}`}
+      style={{ height, background, border: "1px solid color-mix(in srgb, white 12%, transparent)" }}
     >
-      {/* ambiente */}
       <div
         className="absolute inset-0"
         style={{
-          background: `radial-gradient(70% 90% at 15% 0%, ${accent}33, transparent 70%), radial-gradient(60% 80% at 95% 100%, ${secondary}26, transparent 70%)`,
+          background: `radial-gradient(70% 100% at 82% -20%, color-mix(in srgb, ${accent} 32%, transparent), transparent 70%)`,
         }}
       />
-      {/* sidebar */}
-      <div className="absolute inset-y-0 left-0 w-[22%]" style={{ background: surface, opacity: 0.9 }}>
-        <div className="mt-1.5 ml-1.5 h-1.5 w-1.5 rounded-[2px]" style={{ background: accent }} />
-        <div className="mt-2 ml-1.5 h-1 w-[60%] rounded-full bg-white/15" />
-        <div className="mt-1 ml-1.5 h-1 w-[45%] rounded-full bg-white/10" />
+      <div className="absolute inset-y-0 left-0 w-[23%] border-r" style={{ background: sidebar, borderColor: "color-mix(in srgb, white 8%, transparent)" }}>
+        <div className="mt-2 ml-2 h-2 w-2 rounded-[3px]" style={{ background: accent }} />
+        <div className="relative mt-2.5 ml-1.5 h-2 w-[72%] rounded-[3px]" style={{ background: "color-mix(in srgb, white 11%, transparent)" }}>
+          <span className="absolute inset-y-0 left-0 w-[2px] rounded-full" style={{ background: accent }} />
+        </div>
+        <div className="mt-1.5 ml-1.5 h-1 w-[52%] rounded-full" style={{ background: "color-mix(in srgb, white 12%, transparent)" }} />
+        <div className="mt-1.5 ml-1.5 h-1 w-[64%] rounded-full" style={{ background: "color-mix(in srgb, white 8%, transparent)" }} />
       </div>
-      {/* card */}
+      <div className="absolute left-[29%] right-[8%] top-[14%] h-1 rounded-full" style={{ background: "color-mix(in srgb, white 18%, transparent)" }} />
       <div
-        className="absolute left-[27%] right-[8%] top-[18%] rounded-[5px] border border-white/10 p-1.5"
-        style={{ background: surface }}
+        className="absolute left-[29%] right-[8%] top-[30%] h-[48%] rounded-[6px] border p-1.5"
+        style={{ background: card, borderColor: "color-mix(in srgb, white 10%, transparent)" }}
       >
-        <div className="h-1.5 w-[34%] rounded-full" style={{ background: accent }} />
-        <div className="mt-1.5 h-1 w-[72%] rounded-full bg-white/18" />
-        <div className="mt-1 h-1 w-[52%] rounded-full bg-white/10" />
+        <div className="flex items-center justify-between">
+          <div className="h-1.5 w-[35%] rounded-full" style={{ background: accent }} />
+          <div className="h-2 w-2 rounded-full" style={{ background: "color-mix(in srgb, white 20%, transparent)" }} />
+        </div>
+        <div className="mt-2 h-1 w-[80%] rounded-full" style={{ background: "color-mix(in srgb, white 18%, transparent)" }} />
+        <div className="mt-1.5 h-1 w-[56%] rounded-full" style={{ background: "color-mix(in srgb, white 10%, transparent)" }} />
       </div>
-      {/* barra de acento */}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${accent}, ${secondary})` }} />
+      <div className="absolute bottom-[12%] left-[32%] h-1.5 w-[25%] rounded-full" style={{ background: accent }} />
     </div>
   );
 }
@@ -58,12 +61,8 @@ export function ThemeSwitcher() {
   const { theme, setTheme, themes, order, custom } = useTheme();
   const [open, setOpen] = useState(false);
 
-  const customPreview: ThemeMeta["preview"] = [
-    "#08090C",
-    "#12141A",
-    custom.colors[0] || "#5865F2",
-    custom.colors[1] || custom.colors[0] || "#22C5C2",
-  ];
+  const customTokens = buildCustomTheme(custom);
+  const customPreview: ThemeMeta["preview"] = [customTokens["--background"], customTokens["--sidebar"], customTokens["--card"], customTokens["--accent"]];
 
   const Grid = (
     <div className="grid grid-cols-2 gap-2.5">
@@ -84,13 +83,13 @@ export function ThemeSwitcher() {
                 : "border-[var(--border)] bg-[var(--card-soft)] hover:border-[var(--border-strong)]"
             }`}
           >
-            <ThemePreview preview={t.preview} />
+            <ThemePreview preview={t.preview} height={62} />
+            {active && <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] shadow-sm"><Check className="h-3 w-3" /></span>}
             <div className="mt-2 flex items-start justify-between gap-1">
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold leading-tight truncate">{t.label}</p>
                 <p className="text-[10.5px] text-[var(--muted-foreground)] leading-tight truncate">{t.desc}</p>
               </div>
-              {active && <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent)] mt-0.5" />}
             </div>
           </button>
         );
@@ -109,13 +108,13 @@ export function ThemeSwitcher() {
             : "border-[var(--border)] bg-[var(--card-soft)] hover:border-[var(--border-strong)]"
         }`}
       >
-        <ThemePreview preview={customPreview} />
+        <ThemePreview preview={customPreview} height={62} />
+        {theme === "custom" && <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] shadow-sm"><Check className="h-3 w-3" /></span>}
         <div className="mt-2 flex items-start justify-between gap-1">
           <div className="min-w-0">
             <p className="text-[12px] font-semibold leading-tight truncate">Personalizado</p>
             <p className="text-[10.5px] text-[var(--muted-foreground)] leading-tight truncate">Suas cores</p>
           </div>
-          {theme === "custom" && <Check className="h-3.5 w-3.5 shrink-0 text-[var(--accent)] mt-0.5" />}
         </div>
       </button>
     </div>

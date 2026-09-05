@@ -1,8 +1,8 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Wallet, TrendingUp, CalendarPlus, Bell, GraduationCap, HandCoins, Star, Sparkles } from "lucide-react";
+import { X, Wallet, TrendingUp, CalendarPlus, Bell, GraduationCap, HandCoins, Star, Sparkles, CalendarDays, AlignLeft, Building2, Pencil, Check, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { AIParserService } from "@/lib/ai/parser";
+import type { ResolvedParsedIntent } from "@/lib/ai/types";
 import { TransactionDialog } from "@/components/rise/TransactionDialog";
 import { DebtDialog } from "@/components/rise/DebtDialog";
 import { EventDialog } from "@/components/rise/EventDialog";
@@ -20,7 +20,13 @@ import { formatBRL } from "@/lib/utils";
 
 export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [ai, setAi] = useState("");
-  const [parsed, setParsed] = useState<string | null>(null);
+  const [parsed, setParsed] = useState<ResolvedParsedIntent | null>(null);
+  const [operationKey, setOperationKey] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
+  const [aiProvider, setAiProvider] = useState<"openai" | "mock" | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const [txOpen, setTxOpen] = useState<null | "expense" | "income">(null);
   const [debtOpen, setDebtOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
@@ -30,20 +36,69 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
   const { push } = useToast();
 
   const handleAI = async () => {
-    if (!ai.trim()) return;
-    const svc = new AIParserService();
-    const res = await svc.parse(ai);
-    setParsed(JSON.stringify(res, null, 2));
+    if (!ai.trim() || aiLoading) return;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const response = await fetch("/api/ai/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: ai }) });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.data) throw new Error(payload?.error || "Não foi possível interpretar o texto agora.");
+      setParsed(payload.data as ResolvedParsedIntent);
+      setOperationKey(crypto.randomUUID());
+      setConfirmError("");
+      setAiProvider(payload.provider === "openai" ? "openai" : "mock");
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "Não foi possível interpretar o texto agora.");
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const openTx = (t: "expense" | "income") => {
+    setParsed(null);
     setTxOpen(t);
+  };
+
+  const openParsed = () => {
+    if (!parsed) return;
+    if (parsed.intent === "transaction") setTxOpen(parsed.data.type || "expense");
+    if (parsed.intent === "debt") setDebtOpen(true);
+    if (parsed.intent === "event") setEventOpen(true);
+    if (parsed.intent === "reminder") setReminderOpen(true);
+    if (parsed.intent === "important") setImportantOpen(true);
+    if (parsed.intent === "school_task") setSchoolOpen(true);
+  };
+
+  const anyDialogOpen = !!txOpen || debtOpen || eventOpen || reminderOpen || importantOpen || schoolOpen;
+  const previewValues = parsed && parsed.intent !== "unknown"
+    ? Object.entries(parsed.data).filter(([, value]) => value !== null && value !== false && value !== "")
+    : [];
+  const transactionRows = parsed?.intent === "transaction" ? [
+    ["Tipo", parsed.data.type === "income" ? "Receita" : parsed.data.type === "expense" ? "Gasto" : "Não informado"],
+    ["Valor", parsed.data.amount ? formatBRL(parsed.data.amount) : "Não informado"],
+    ["Conta", parsed.accountResolution?.name || "Não informada"],
+    ["Data", parsed.data.occurredAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeZone: "America/Sao_Paulo" }).format(new Date(parsed.data.occurredAt)) : "Não informada"],
+    ["Descrição", parsed.data.description || "Não informada"],
+  ] : [];
+  const canQuickConfirm = parsed?.intent === "transaction" && parsed.confidence >= 0.75 && parsed.missingFields.length === 0 && !!parsed.data.type && !!parsed.data.amount && !!parsed.data.description && !!parsed.data.occurredAt && !!parsed.accountResolution && !!operationKey;
+  const confirmTransaction = async () => {
+    if (!parsed || parsed.intent !== "transaction" || !parsed.accountResolution || !operationKey || confirming) return;
+    setConfirming(true);
+    setConfirmError("");
+    try {
+      await financeService.confirmTransactionWithAccount({ type: parsed.data.type!, amount: parsed.data.amount!, description: parsed.data.description!, account_id: null, account_name: parsed.accountResolution.name, account_color: parsed.accountResolution.status === "create" ? parsed.accountResolution.color : null, account_brand_domain: parsed.accountResolution.status === "create" ? parsed.accountResolution.brandDomain : null, account_brand_key: parsed.accountResolution.status === "create" ? parsed.accountResolution.brandKey : null, category_id: null, category_name: parsed.data.category, occurred_at: parsed.data.occurredAt!, notes: parsed.data.notes, payment_method: parsed.data.paymentMethod, is_recurring: false }, operationKey);
+      push({ title: parsed.data.type === "income" ? "Receita adicionada" : "Gasto adicionado", desc: formatBRL(parsed.data.amount!) });
+      setParsed(null); setOperationKey(null); onClose();
+    } catch (error) {
+      setConfirmError("Não foi possível salvar. Tente novamente.");
+      push({ title: "Erro", desc: "Não foi possível confirmar a operação.", variant: "error" });
+    } finally { setConfirming(false); }
   };
 
   return (
     <>
       <AnimatePresence>
-        {open && !txOpen && (
+        {open && !anyDialogOpen && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
             <motion.div
@@ -64,10 +119,32 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
                   <label className="text-xs font-semibold flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" /> Adicionar com IA</label>
                   <div className="mt-2 flex gap-2">
                     <input value={ai} onChange={(e) => setAi(e.target.value)} placeholder='ex: gastei 32,50 no lanche hoje pelo inter' className="flex-1 h-10 rounded-full border border-[var(--border)] bg-[var(--card)] px-4 text-sm outline-none focus:border-[var(--accent)]" />
-                    <button onClick={handleAI} className="h-10 rounded-full bg-[var(--accent)] text-white px-5 text-sm font-semibold">Interpretar</button>
+                    <button onClick={handleAI} disabled={aiLoading || !ai.trim()} className="h-10 rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] px-5 text-sm font-semibold disabled:opacity-50">{aiLoading ? "Interpretando..." : "Interpretar"}</button>
                   </div>
-                  {parsed && <pre className="mt-3 rounded-xl bg-[var(--background)] p-3 text-xs overflow-auto border border-[var(--border)]">{parsed}</pre>}
-                  {!parsed && <p className="mt-2 text-xs text-[var(--muted-foreground)]">Mock local — via <code>AIParserService</code>. Em breve confirmação editável.</p>}
+                  {aiError && <p role="alert" className="mt-2 text-xs text-[var(--negative)]">{aiError}</p>}
+                  {parsed && (
+                    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className="mt-3 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
+                      <div className="flex items-center justify-between gap-3"><p className="flex items-center gap-1.5 text-xs font-semibold"><Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />Confira antes de salvar</p>{aiProvider === "openai" && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[10px] text-[var(--muted-foreground)]"><Sparkles className="h-3 w-3" />Interpretado com IA</span>}</div>
+                      {parsed.clarification && <p className="mt-2 text-xs text-amber-300">{parsed.clarification}</p>}
+                      {parsed.intent === "unknown" ? <p className="mt-2 text-xs text-[var(--muted-foreground)]">Escolha uma opção abaixo ou reformule o texto.</p> : (
+                        <>
+                          {parsed.intent === "transaction" ? <>
+                            <div className="mt-4 flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${parsed.data.type === "income" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--card-soft)] text-[var(--negative)]"}`}>{parsed.data.type === "income" ? <TrendingUp className="h-5 w-5" /> : <Wallet className="h-5 w-5" />}</span><div><p className="text-xs text-[var(--muted-foreground)]">{parsed.data.type === "income" ? "Receita" : "Gasto"}</p><p className="text-xl font-semibold tracking-tight">{parsed.data.amount ? formatBRL(parsed.data.amount) : "Valor não informado"}</p></div></div>
+                            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                              <div className="flex gap-2 rounded-xl bg-[var(--card-soft)] p-2.5"><Building2 className="mt-0.5 h-4 w-4 text-[var(--faint)]" /><div><p className="text-[10px] uppercase tracking-wide text-[var(--faint)]">Conta</p><p className="text-xs font-medium">{parsed.accountResolution?.name || "Não informada"}</p></div></div>
+                              <div className="flex gap-2 rounded-xl bg-[var(--card-soft)] p-2.5"><CalendarDays className="mt-0.5 h-4 w-4 text-[var(--faint)]" /><div><p className="text-[10px] uppercase tracking-wide text-[var(--faint)]">Data</p><p className="text-xs font-medium">{parsed.data.occurredAt ? `Hoje · ${new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(new Date(parsed.data.occurredAt))}` : "Não informada"}</p></div></div>
+                              <div className="flex gap-2 rounded-xl bg-[var(--card-soft)] p-2.5"><AlignLeft className="mt-0.5 h-4 w-4 text-[var(--faint)]" /><div><p className="text-[10px] uppercase tracking-wide text-[var(--faint)]">Descrição</p><p className="text-xs font-medium">{parsed.data.description || "Não informada"}</p></div></div>
+                            </div>
+                            {parsed.accountResolution?.status === "create" && <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2"><Building2 className="h-4 w-4 text-[var(--accent)]" /><div className="min-w-0"><p className="text-xs font-semibold">{parsed.accountResolution.name} <span className="ml-1 rounded-full bg-[var(--card)] px-1.5 py-0.5 text-[9px] text-[var(--accent)]">NOVA CONTA</span></p><p className="text-[11px] text-[var(--muted-foreground)]">Será criada automaticamente ao confirmar.</p></div></div>}
+                          </> : <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">{previewValues.map(([key, value]) => <div key={key}><dt className="text-[var(--faint)]">{key.replace(/([A-Z])/g, " $1")}</dt><dd className="truncate">{String(value)}</dd></div>)}</dl>}
+                          {parsed.missingFields.length > 0 && <p className="mt-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-xs text-amber-200">Preencha antes de confirmar: {parsed.missingFields.join(", ")}.</p>}
+                          {confirmError && <p role="alert" className="mt-3 text-xs text-[var(--negative)]">{confirmError}</p>}
+                          <div className="mt-4 flex flex-wrap justify-end gap-2"><button onClick={() => { setParsed(null); setOperationKey(null); }} className="min-h-9 rounded-full px-3 text-xs text-[var(--muted-foreground)]">Cancelar</button><button onClick={openParsed} className="inline-flex min-h-9 items-center gap-1 rounded-full border border-[var(--border)] px-3 text-xs font-semibold"><Pencil className="h-3.5 w-3.5" />Revisar</button>{canQuickConfirm && <button onClick={confirmTransaction} disabled={confirming} className="inline-flex min-h-9 items-center gap-1 rounded-full bg-[var(--accent)] px-3.5 text-xs font-semibold text-[var(--accent-foreground)] disabled:opacity-50">{confirming ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Salvando...</> : <><Check className="h-3.5 w-3.5" />Confirmar</>}</button>}</div>
+                        </>
+                      )}
+                    </motion.div>
+                  )}
+                  {!parsed && !aiError && <p className="mt-2 text-xs text-[var(--muted-foreground)]">Descreva em linguagem natural. Você revisa e confirma antes de qualquer salvamento.</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
@@ -116,6 +193,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       <TransactionDialog
         open={!!txOpen}
         defaultType={txOpen || "expense"}
+        draft={parsed?.intent === "transaction" ? { type: parsed.data.type || "expense", amount: parsed.data.amount ?? undefined, description: parsed.data.description || "", occurred_at: parsed.data.occurredAt || undefined, category_name: parsed.data.category, notes: parsed.data.notes, payment_method: parsed.data.paymentMethod, account_id: parsed.accountResolution?.status === "existing" ? parsed.accountResolution.id : null, account_name: parsed.accountResolution?.status === "create" ? parsed.accountResolution.name : null, account_color: parsed.accountResolution?.status === "create" ? parsed.accountResolution.color : null, account_brand_domain: parsed.accountResolution?.status === "create" ? parsed.accountResolution.brandDomain : null, account_brand_key: parsed.accountResolution?.status === "create" ? parsed.accountResolution.brandKey : null } : undefined}
         onClose={() => setTxOpen(null)}
         onSave={async (data) => {
           try {
@@ -123,9 +201,11 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
               const cat = await financeService.ensureCategoryAsync(data.category_name);
               data.category_id = cat.id;
             }
-            await financeService.createTransaction(data as never);
+            if (data.account_name) await financeService.confirmTransactionWithAccount(data as never, operationKey || crypto.randomUUID());
+            else await financeService.createTransaction(data as never);
             push({ title: data.type === "expense" ? "Gasto adicionado" : "Receita adicionada", desc: formatBRL(data.amount) });
             setTxOpen(null);
+            setParsed(null);
             onClose();
           } catch (e: unknown) {
             push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
@@ -135,12 +215,14 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       />
       <DebtDialog
         open={debtOpen}
+        draft={parsed?.intent === "debt" ? { kind: parsed.data.kind || "owed", person: parsed.data.person || "", amount: parsed.data.amount ?? undefined, description: parsed.data.description, due_date: parsed.data.dueDate, notes: parsed.data.notes } : undefined}
         onClose={() => setDebtOpen(false)}
         onSave={async (data) => {
           try {
             await debtService.createDebt(data as never);
             push({ title: "Dívida criada", desc: data.person });
             setDebtOpen(false);
+            setParsed(null);
             onClose();
           } catch (e: unknown) {
             push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
@@ -150,12 +232,14 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       />
       <EventDialog
         open={eventOpen}
+        draft={parsed?.intent === "event" ? { title: parsed.data.title || "", description: parsed.data.description, category: parsed.data.category || "personal", starts_at: parsed.data.startsAt || undefined, ends_at: parsed.data.endsAt, all_day: parsed.data.allDay || false } : undefined}
         onClose={() => setEventOpen(false)}
         onSave={async (data) => {
           try {
             await calendarService.create(data as never);
             push({ title: "Evento criado", desc: data.title });
             setEventOpen(false);
+            setParsed(null);
             onClose();
           } catch (e: unknown) {
             push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
@@ -165,6 +249,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       />
       <ReminderDialog
         open={reminderOpen}
+        draft={parsed?.intent === "reminder" ? { title: parsed.data.title || "", notes: parsed.data.notes, due_at: parsed.data.dueAt, priority: parsed.data.priority || "medium", recurrence: parsed.data.recurrence || "none" } : undefined}
         onClose={() => setReminderOpen(false)}
         onSave={async (data) => {
           try {
@@ -172,6 +257,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
             await reminderService.create(data);
             push({ title: "Lembrete criado", desc: data.title });
             setReminderOpen(false);
+            setParsed(null);
             onClose();
           } catch (e: unknown) {
             push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
@@ -181,12 +267,14 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       />
       <ImportantDialog
         open={importantOpen}
+        draft={parsed?.intent === "important" ? { title: parsed.data.title || "", content: parsed.data.content, tag: parsed.data.tag, pinned: parsed.data.pinned || false, remind_at: parsed.data.remindAt } : undefined}
         onClose={() => setImportantOpen(false)}
         onSave={async (data) => {
           try {
             await importantService.create(data);
             push({ title: "Guardado em Importantes", desc: data.title });
             setImportantOpen(false);
+            setParsed(null);
             onClose();
           } catch (e: unknown) {
             push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
@@ -196,12 +284,14 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       />
       <SchoolTaskDialog
         open={schoolOpen}
+        draft={parsed?.intent === "school_task" ? { title: parsed.data.title || "", subject: parsed.data.subject, description: parsed.data.description, type: parsed.data.type || "homework", priority: parsed.data.priority || "medium", due_at: parsed.data.dueAt } : undefined}
         onClose={() => setSchoolOpen(false)}
         onSave={async (data) => {
           try {
             await schoolService.create(data);
             push({ title: "Atividade criada", desc: data.title });
             setSchoolOpen(false);
+            setParsed(null);
             onClose();
           } catch (e: unknown) {
             push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
@@ -212,4 +302,3 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
     </>
   );
 }
-
