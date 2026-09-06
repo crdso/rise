@@ -98,6 +98,8 @@ export type CustomTheme = {
   intensity: number;
   /** Preset de origem; alterações manuais limpam esse vínculo. */
   presetId: string | null;
+  /** Evita confundir percentuais baixos com a escala legada de ambiente. */
+  schemaVersion: 2;
 };
 
 export const DEFAULT_CUSTOM: CustomTheme = {
@@ -105,6 +107,7 @@ export const DEFAULT_CUSTOM: CustomTheme = {
   angle: 48,
   intensity: 80,
   presetId: "deep-blurple",
+  schemaVersion: 2,
 };
 
 export const CUSTOM_MIN_COLORS = 2;
@@ -157,8 +160,9 @@ export function normalizeCustomTheme(value: Partial<CustomTheme> | null | undefi
   const requestedColors = Array.isArray(value?.colors) ? value.colors.filter(isHex).slice(0, CUSTOM_MAX_COLORS) : [];
   const colors = requestedColors.length >= CUSTOM_MIN_COLORS ? requestedColors : DEFAULT_CUSTOM.colors;
   const rawIntensity = Number(value?.intensity);
+  const isLegacyIntensity = value?.schemaVersion !== 2 && rawIntensity >= 0.3 && rawIntensity <= 2;
   const intensity = Number.isFinite(rawIntensity)
-    ? rawIntensity <= 2
+    ? isLegacyIntensity
       ? Math.round(clamp((rawIntensity - 0.3) / 1.1, 0, 1) * 100)
       : Math.round(clamp(rawIntensity, 0, 100))
     : DEFAULT_CUSTOM.intensity;
@@ -167,7 +171,12 @@ export function normalizeCustomTheme(value: Partial<CustomTheme> | null | undefi
   const presetId = typeof value?.presetId === "string" && CUSTOM_GRADIENT_PRESETS.some((preset) => preset.id === value.presetId)
     ? value.presetId
     : null;
-  return { colors, angle, intensity, presetId };
+  return { colors, angle, intensity, presetId, schemaVersion: 2 };
+}
+
+export function needsCustomThemeUpgrade(value: Partial<CustomTheme> | null | undefined) {
+  const intensity = Number(value?.intensity);
+  return value?.schemaVersion !== 2 && Number.isFinite(intensity) && intensity >= 0.3 && intensity <= 2;
 }
 
 export function ambientIntensityForCustom(custom: CustomTheme): number {
@@ -248,8 +257,9 @@ export function buildCustomTheme(custom: CustomTheme): Record<string, string> {
     : [];
   const colors = requestedColors.length >= 2 ? requestedColors : ["#2C3FE7", "#261D83"];
   const rawIntensity = Number(value.intensity);
+  const isLegacyIntensity = value.schemaVersion !== 2 && rawIntensity >= 0.3 && rawIntensity <= 2;
   const intensity = Number.isFinite(rawIntensity)
-    ? rawIntensity <= 2
+    ? isLegacyIntensity
       ? Math.round(clampValue((rawIntensity - 0.3) / 1.1, 0, 1) * 100)
       : Math.round(clampValue(rawIntensity, 0, 100))
     : 80;

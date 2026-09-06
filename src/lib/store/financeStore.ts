@@ -19,10 +19,10 @@ const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 const DEFAULT_ACCOUNTS: Account[] = [
-  { id: "acc-inter", name: "Inter", icon: "inter", type: "checking", color: "#FF6A30", brand_domain: "inter.co", brand_key: "inter", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: "acc-nubank", name: "Nubank", icon: "nubank", type: "checking", color: "#820AD1", brand_domain: "nubank.com.br", brand_key: "nubank", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: "acc-mp", name: "Mercado Pago", icon: "mercadopago", type: "wallet", color: "#00A9FF", brand_domain: "mercadopago.com.br", brand_key: "mercadopago", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: "acc-bb", name: "Banco do Brasil", icon: "bb", type: "checking", color: "#FACC15", brand_domain: "bb.com.br", brand_key: "bb", initial_balance: 0, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "acc-inter", name: "Inter", icon: "inter", type: "checking", color: "#FF6A30", brand_domain: "inter.co", brand_key: "inter", initial_balance: 0, is_active: true, sort_order: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "acc-nubank", name: "Nubank", icon: "nubank", type: "checking", color: "#820AD1", brand_domain: "nubank.com.br", brand_key: "nubank", initial_balance: 0, is_active: true, sort_order: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "acc-mp", name: "Mercado Pago", icon: "mercadopago", type: "wallet", color: "#00A9FF", brand_domain: "mercadopago.com.br", brand_key: "mercadopago", initial_balance: 0, is_active: true, sort_order: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: "acc-bb", name: "Banco do Brasil", icon: "bb", type: "checking", color: "#FACC15", brand_domain: "bb.com.br", brand_key: "bb", initial_balance: 0, is_active: true, sort_order: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
 type State = {
@@ -72,7 +72,7 @@ export const useFinanceStore = create<State>()(
       setHydrated: (v) => set({ _hasHydrated: v }),
       upsertAccount: (a) => set((s) => {
         const exists = s.accounts.find(x => x.id === a.id);
-        return { accounts: exists ? s.accounts.map(x => x.id === a.id ? a : x) : [a, ...s.accounts] };
+        return { accounts: exists ? s.accounts.map(x => x.id === a.id ? a : x) : [...s.accounts, a] };
       }),
       removeAccount: (id) => set((s) => ({ accounts: s.accounts.filter(x => x.id !== id) })),
       setAccounts: (a) => set({ accounts: a }),

@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { monthGridDays, formatDateKey } from "@/lib/timezone";
-import { WEEKDAYS_SHORT, WEEKDAYS_MIN, EventChip, sortEvents, CAT_COLOR } from "./shared";
+import { MONTH_WEEKDAYS_SHORT, MONTH_WEEKDAYS_MIN, EventChip, sortEvents, CAT_COLOR } from "./shared";
 import type { CalendarEvent } from "@/types/calendar";
 
 /**
@@ -39,13 +39,13 @@ export function MonthGrid({
   return (
     <div className="rounded-[18px] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
       <div className="grid grid-cols-7 border-b border-[var(--border)] bg-[var(--card-soft)]">
-        {WEEKDAYS_SHORT.map((w, i) => (
+        {MONTH_WEEKDAYS_SHORT.map((w, i) => (
           <div
             key={w + i}
             className="py-2 text-center text-[10.5px] tracking-[0.1em] font-medium text-[var(--faint)] uppercase"
           >
             <span className="hidden sm:inline">{w}</span>
-            <span className="sm:hidden">{WEEKDAYS_MIN[i]}</span>
+            <span className="sm:hidden">{MONTH_WEEKDAYS_MIN[i]}</span>
           </div>
         ))}
       </div>

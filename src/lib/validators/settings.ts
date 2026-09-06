@@ -7,6 +7,7 @@ export const customThemeSchema = z.object({
   angle: z.number().min(0).max(360),
   intensity: z.number().int().min(0).max(100),
   presetId: z.string().max(40).nullable(),
+  schemaVersion: z.literal(2),
 });
 
 export const dashboardLayoutSchema = z.object({

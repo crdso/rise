@@ -21,10 +21,10 @@ function inferBrand(name: string): { brand_domain: string | null; brand_key: str
 }
 
 // Demo helpers (local store)
-function demoCreateAccount(data: Omit<Account, "id" | "created_at" | "updated_at">): Account {
+function demoCreateAccount(data: Omit<Account, "id" | "created_at" | "updated_at" | "sort_order">): Account {
   const now = new Date().toISOString();
   const inferred = !data.brand_domain && !data.brand_key ? inferBrand(data.name) : { brand_domain: data.brand_domain || null, brand_key: data.brand_key || null };
-  const acc: Account = { id: uid(), created_at: now, updated_at: now, ...data, brand_domain: inferred.brand_domain, brand_key: inferred.brand_key };
+  const acc: Account = { id: uid(), created_at: now, updated_at: now, sort_order: useFinanceStore.getState().accounts.length, ...data, brand_domain: inferred.brand_domain, brand_key: inferred.brand_key };
   useFinanceStore.getState().upsertAccount(acc);
   useFinanceStore.getState().pushAudit({ id: uid(), actor: "Você", action: "criou uma conta", entity: "account", entity_id: acc.id, after: acc, origin: "web", created_at: now });
   return acc;
@@ -44,8 +44,8 @@ export const financeService = {
   listAccounts(): Account[] {
     return useFinanceStore.getState().accounts;
   },
-  async createAccount(data: Omit<Account, "id" | "created_at" | "updated_at">): Promise<Account> {
-    const enriched = { ...data } as Omit<Account, "id" | "created_at" | "updated_at">;
+  async createAccount(data: Omit<Account, "id" | "created_at" | "updated_at" | "sort_order">): Promise<Account> {
+    const enriched = { ...data } as Omit<Account, "id" | "created_at" | "updated_at" | "sort_order">;
     if (!enriched.brand_domain && !enriched.brand_key) {
       const inf = inferBrand(enriched.name);
       enriched.brand_domain = inf.brand_domain;
@@ -61,6 +61,16 @@ export const financeService = {
     const updated = await api<Account>(`/api/accounts/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
     useFinanceStore.getState().upsertAccount(updated);
     return updated;
+  },
+  async reorderAccounts(order: string[]): Promise<void> {
+    if (!isSupabaseConfigured()) {
+      const accounts = useFinanceStore.getState().accounts;
+      useFinanceStore.getState().setAccounts(order.map((id, index) => ({ ...accounts.find((account) => account.id === id)!, sort_order: index })));
+      return;
+    }
+    await api<void>("/api/accounts/reorder", { method: "POST", body: JSON.stringify({ order }) });
+    const accounts = useFinanceStore.getState().accounts;
+    useFinanceStore.getState().setAccounts(order.map((id, index) => ({ ...accounts.find((account) => account.id === id)!, sort_order: index })));
   },
 
   // Categories

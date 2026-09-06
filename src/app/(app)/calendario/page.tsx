@@ -92,6 +92,7 @@ export default function CalendarioPage() {
     setCursorKey(todayKey);
     setSelectedKey(todayKey);
   };
+  const isCurrentPeriod = view === "month" ? cursorKey.slice(0, 7) === todayKey.slice(0, 7) : cursorKey === todayKey;
 
   const openCreate = (key: string, time?: string) => {
     setEditing(null);
@@ -186,8 +187,8 @@ export default function CalendarioPage() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" className="rounded-full px-3" onClick={goToday}>
-                Hoje
+              <Button variant="ghost" size="sm" className="rounded-full px-3 first-letter:uppercase" onClick={goToday}>
+                {isCurrentPeriod ? "Hoje" : formatDateKey(cursorKey, { month: "short", year: "numeric" })}
               </Button>
               <Button
                 variant="ghost"

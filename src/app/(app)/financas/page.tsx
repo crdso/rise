@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Wallet,
@@ -34,7 +34,7 @@ import {
   previousMonthKey,
   transactionsInMonth,
 } from "@/lib/finance/analytics";
-import { formatDateKey, addMonthsToDateKey } from "@/lib/timezone";
+import { formatDateKey, addMonthsToDateKey, saoPauloMonthKey } from "@/lib/timezone";
 
 function monthLabel(monthKey: string) {
   return formatDateKey(`${monthKey}-01`, { month: "long", year: "numeric" });
@@ -56,6 +56,13 @@ export default function FinancasPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [defaultType, setDefaultType] = useState<"expense" | "income">("expense");
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [minMonth, setMinMonth] = useState(thisMonth);
+
+  useEffect(() => {
+    fetch("/api/finance/meta").then((response) => response.ok ? response.json() : null).then((payload) => {
+      if (payload?.data?.createdAt) setMinMonth(saoPauloMonthKey(payload.data.createdAt));
+    }).catch(() => {});
+  }, []);
 
   const stats = useMemo(() => {
     const current = monthStats(transactions, monthKey);
@@ -113,6 +120,7 @@ export default function FinancasPage() {
 
   const activeAccounts = accounts.filter((a) => a.is_active);
   const isFuture = monthKey >= thisMonth;
+  const isBeforeHistory = monthKey <= minMonth;
 
   return (
     <div className="space-y-5">
@@ -158,7 +166,8 @@ export default function FinancasPage() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full"
+            className="h-8 w-8 rounded-full disabled:opacity-30"
+            disabled={isBeforeHistory}
             onClick={() => setMonthKey((k) => previousMonthKey(k))}
             aria-label="Mês anterior"
           >

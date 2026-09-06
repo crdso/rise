@@ -57,15 +57,6 @@ export function SpendWidget({
   return (
     <div>
       <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
-        <div className="min-w-0">
-          <p className="text-[34px] sm:text-[40px] font-semibold tracking-[-0.03em] leading-none tnum">
-            {formatBRL(expense)}
-          </p>
-          <div className="mt-3">
-            <DeltaChip pct={pct} invert />
-          </div>
-        </div>
-
         <Link
           href="/financas/contas"
           aria-label="Ver saldo total e contas"
@@ -78,6 +69,15 @@ export function SpendWidget({
             {formatBRL(totalBalance)}
           </p>
         </Link>
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--muted-foreground)]">Gastos do mês</p>
+          <p className="mt-1 text-[28px] sm:text-[32px] font-semibold tracking-[-0.03em] leading-none tnum">
+            {formatBRL(expense)}
+          </p>
+          <div className="mt-3">
+            <DeltaChip pct={pct} invert />
+          </div>
+        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[var(--border)] pt-4 sm:gap-6">

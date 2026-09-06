@@ -17,6 +17,8 @@ export const CAT_LABEL: Record<EventCategory, string> = {
 
 export const WEEKDAYS_SHORT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 export const WEEKDAYS_MIN = ["S", "T", "Q", "Q", "S", "S", "D"];
+export const MONTH_WEEKDAYS_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+export const MONTH_WEEKDAYS_MIN = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 export function eventTime(iso: string) {
   return new Intl.DateTimeFormat("pt-BR", {

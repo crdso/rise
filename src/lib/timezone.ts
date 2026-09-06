@@ -138,6 +138,11 @@ export function startOfWeekKey(key: string): string {
   return addDaysToDateKey(key, -weekdayIndexFromDateKey(key));
 }
 
+/** Chave do domingo da semana que contém `key`, usada apenas pela grade mensal. */
+export function startOfSundayWeekKey(key: string): string {
+  return addDaysToDateKey(key, -dateKeyToAnchor(key).getUTCDay());
+}
+
 /** Formata uma chave de dia sem risco de drift (a âncora é lida em UTC). */
 export function formatDateKey(key: string, opts: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat("pt-BR", { ...opts, timeZone: "UTC" }).format(dateKeyToAnchor(key));
@@ -188,8 +193,8 @@ export function monthGridDays(year: number, monthIndex0: number): Array<{ key: s
   const firstKey = `${year}-${pad2(monthIndex0 + 1)}-01`;
   const daysInMonth = new Date(Date.UTC(year, monthIndex0 + 1, 0)).getUTCDate();
   const lastKey = `${year}-${pad2(monthIndex0 + 1)}-${pad2(daysInMonth)}`;
-  const start = startOfWeekKey(firstKey);
-  const endWeek = startOfWeekKey(lastKey);
+  const start = startOfSundayWeekKey(firstKey);
+  const endWeek = startOfSundayWeekKey(lastKey);
   const end = addDaysToDateKey(endWeek, 6);
 
   const out: Array<{ key: string; inMonth: boolean }> = [];

@@ -11,6 +11,7 @@ import {
   ambientIntensityForCustom,
   buildCustomTheme,
   isPresetTheme,
+  needsCustomThemeUpgrade,
   normalizeCustomTheme,
   CUSTOM_VAR_KEYS,
   type ThemeId,
@@ -191,7 +192,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.setAttribute("data-theme", t);
         try { localStorage.setItem(K_THEME, t); } catch {}
       }
-      const nextCustom = normalizeCustomTheme({ ...savedCustom, ...(remote.custom_theme ?? {}) });
+      const remoteCustom = remote.custom_theme ?? savedCustom;
+      const nextCustom = normalizeCustomTheme(remoteCustom);
       setCustomState(nextCustom);
       if (resolvedTheme === "custom") {
         applyCustomVars(nextCustom);
@@ -201,6 +203,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.style.removeProperty("--ambient-intensity");
       }
       try { localStorage.setItem(K_CUSTOM, JSON.stringify(nextCustom)); } catch {}
+      if (needsCustomThemeUpgrade(remote.custom_theme)) {
+        void settingsService.save({ custom_theme: nextCustom, ambient_intensity: ambientIntensityForCustom(nextCustom) }).catch(() => console.warn("[rise-settings] custom theme upgrade sync failed."));
+      }
 
       if (typeof remote.reduced_motion === "boolean") {
         setReducedMotionState(remote.reduced_motion);

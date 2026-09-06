@@ -103,10 +103,16 @@ export function auditIcon(entry: Pick<AuditEntry, "entity" | "action">): LucideI
 }
 
 /** Tom da entrada — exclusões e arquivamentos merecem destaque discreto. */
-export function auditTone(entry: Pick<AuditEntry, "action">): "neutral" | "positive" | "danger" {
+export function auditTone(entry: Pick<AuditEntry, "action" | "entity" | "origin">): "neutral" | "positive" | "danger" | "info" | "security" | "ai" | "settings" | "finance" {
   const a = entry.action.toLowerCase();
   if (a.includes("excluiu")) return "danger";
   if (a.includes("conclu") || a.includes("quitou") || a.includes("registrou um pagamento")) return "positive";
+  if (a.includes("criou")) return "positive";
+  if (entry.origin === "ai") return "ai";
+  if (entry.entity === "session") return "security";
+  if (entry.entity === "settings") return "settings";
+  if (["transaction", "account", "debt", "debt_payment"].includes(entry.entity)) return "finance";
+  if (a.includes("editou") || a.includes("atualizou")) return "info";
   return "neutral";
 }
 

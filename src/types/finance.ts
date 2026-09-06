@@ -9,6 +9,7 @@ export type Account = {
   brand_key?: string | null;
   initial_balance: number;
   is_active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 };

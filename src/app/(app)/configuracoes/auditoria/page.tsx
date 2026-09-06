@@ -290,9 +290,15 @@ export default function AuditoriaPage() {
                           className={`h-9 w-9 shrink-0 grid place-items-center rounded-xl border ${
                             tone === "danger"
                               ? "border-[var(--negative)]/25 bg-[var(--negative)]/10 text-[var(--negative)]"
-                              : tone === "positive"
+                              : tone === "positive" || tone === "finance"
                                 ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                                : "border-[var(--border)] bg-[var(--card-soft)] text-[var(--muted-foreground)]"
+                                : tone === "info" || tone === "ai"
+                                  ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-300"
+                                  : tone === "security"
+                                    ? "border-amber-400/25 bg-amber-400/10 text-amber-300"
+                                    : tone === "settings"
+                                      ? "border-violet-400/25 bg-violet-400/10 text-violet-300"
+                                      : "border-[var(--border)] bg-[var(--card-soft)] text-[var(--muted-foreground)]"
                           }`}
                         >
                           <Icon className="h-4 w-4" />

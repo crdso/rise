@@ -1,14 +1,13 @@
-import Image from "next/image";
-
 /** Marca única do RISE, reutilizada em header, sidebar e login. */
 
 export function RiseMark({ size = 24, className }: { size?: number; className?: string }) {
   return (
-    <Image
-      src="/icons/R.png"
+    <img
+      src="/icons/R.png?v=71a6bf8"
       alt=""
       width={size}
       height={size}
+      draggable={false}
       className={`shrink-0 object-contain ${className || ""}`}
     />
   );

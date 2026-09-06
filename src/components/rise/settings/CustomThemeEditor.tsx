@@ -222,12 +222,12 @@ export function CustomThemeEditor() {
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {CUSTOM_GRADIENT_PRESETS.map((preset) => {
             const selected = draft.presetId === preset.id;
-            const gradient = buildCustomTheme({ ...preset, presetId: preset.id })["--theme-gradient"];
+            const gradient = buildCustomTheme({ ...preset, presetId: preset.id, schemaVersion: 2 })["--theme-gradient"];
             return (
               <button
                 key={preset.id}
                 type="button"
-                onClick={() => commit({ ...preset, presetId: preset.id })}
+                onClick={() => commit({ ...preset, presetId: preset.id, schemaVersion: 2 })}
                 aria-label={`Aplicar ${preset.label}`}
                 aria-pressed={selected}
                 title={preset.label}

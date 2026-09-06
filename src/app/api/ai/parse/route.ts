@@ -70,6 +70,10 @@ export async function POST(request: Request) {
 
   const now = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "medium", hour12: false }).format(new Date()).replace(" ", "T") + "-03:00";
   const provider = process.env.OPENAI_API_KEY ? new OpenAIProvider() : new MockAIProvider();
+  const startedAt = Date.now();
+  const record = async (status: "success" | "error", result?: ParsedIntent) => {
+    await supabase!.from("ai_interactions").insert({ user_id: userId, input: body.data.input, intent: result ?? null, confidence: result?.confidence ?? null, provider: provider.name, model: provider.name === "openai" ? (process.env.OPENAI_MODEL?.trim() || "gpt-5.6-luna") : "Interpretador local", status, latency_ms: Date.now() - startedAt }).then(() => {});
+  };
   try {
     const parseInput = body.data.input
       .replace(/\bhj\b/gi, "hoje")
@@ -81,8 +85,10 @@ export async function POST(request: Request) {
       const { data: accounts } = await supabase!.from("accounts").select("id,name").eq("user_id", userId).eq("is_active", true);
       accountResolution = resolveAccount(result.data.account, accounts ?? []);
     }
+    await record("success", result);
     return NextResponse.json({ data: { ...result, accountResolution }, provider: provider.name });
   } catch {
+    await record("error").catch(() => {});
     return NextResponse.json({ error: "Não foi possível interpretar o texto agora. Tente novamente." }, { status: 502 });
   }
 }

@@ -9,7 +9,7 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { data, error } = await supabase.from("accounts").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("accounts").select("*").eq("user_id", user.id).order("sort_order");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }

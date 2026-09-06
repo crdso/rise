@@ -1,5 +1,6 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Reorder, useDragControls } from "framer-motion";
 import { useFinanceStore, calcAccountBalance } from "@/lib/store/financeStore";
 import { financeService } from "@/lib/services/finance";
 import { AccountDialog } from "@/components/rise/AccountDialog";
@@ -7,17 +8,24 @@ import { FinanceNav } from "@/components/rise/FinanceNav";
 import { BrandLogo } from "@/components/rise/BrandLogo";
 import { brandForAccount } from "@/lib/brands/registry";
 import { Button } from "@/components/ui/button";
-import { Plus, EyeOff, Eye, Pencil, Wallet } from "lucide-react";
+import { Plus, EyeOff, Eye, Pencil, Wallet, GripVertical } from "lucide-react";
 import { formatBRL } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { totalBalance } from "@/lib/finance/analytics";
 import { ACCOUNT_TYPE_LABEL } from "@/components/rise/AccountTile";
+
+function AccountReorderItem({ account, onDragEnd, children }: { account: import("@/types/finance").Account; onDragEnd: () => void; children: (startDrag: (event: React.PointerEvent) => void) => React.ReactNode }) {
+  const controls = useDragControls();
+  return <Reorder.Item value={account} dragListener={false} dragControls={controls} onDragEnd={onDragEnd} className={`rounded-[18px] border p-4 flex flex-col gap-3 shadow-sm transition-shadow ${!account.is_active ? "opacity-60 bg-[var(--card-soft)] border-dashed" : "bg-[var(--card)] border-[var(--border)]"}`}>{children((event) => controls.start(event))}</Reorder.Item>;
+}
 
 export default function ContasPage() {
   const { accounts, transactions } = useFinanceStore();
   const { push } = useToast();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const [orderedAccounts, setOrderedAccounts] = useState(accounts);
+  useEffect(() => setOrderedAccounts(accounts), [accounts]);
   const initial = editing ? accounts.find(a=>a.id===editing) || null : null;
   const activeAccounts = useMemo(() => accounts.filter((account) => account.is_active), [accounts]);
   const activeTotal = useMemo(() => totalBalance(accounts, transactions), [accounts, transactions]);
@@ -35,6 +43,14 @@ export default function ContasPage() {
     } catch (e: unknown) {
       push({ title: "Erro", desc: e instanceof Error ? e.message : "Falha", variant: "error" });
       throw e; // mantém o dialog aberto com os dados preenchidos
+    }
+  };
+  const persistOrder = async () => {
+    try {
+      await financeService.reorderAccounts(orderedAccounts.map((account) => account.id));
+    } catch (error) {
+      setOrderedAccounts(accounts);
+      push({ title: "Não foi possível salvar a ordem", desc: error instanceof Error ? error.message : "Tente novamente.", variant: "error" });
     }
   };
 
@@ -62,13 +78,15 @@ export default function ContasPage() {
         </div>
       </section>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {accounts.map((a) => {
+      <Reorder.Group axis="y" values={orderedAccounts} onReorder={setOrderedAccounts} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {orderedAccounts.map((a) => {
           const bal = calcAccountBalance(a, transactions);
           return (
-            <div key={a.id} className={`rounded-[18px] border p-4 flex flex-col gap-3 ${!a.is_active ? "opacity-60 bg-[var(--card-soft)] border-dashed" : "bg-[var(--card)] border-[var(--border)]"}`}>
+            <AccountReorderItem key={a.id} account={a} onDragEnd={persistOrder}>
+              {(startDrag) => <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
+                  <button type="button" onPointerDown={startDrag} aria-label="Arraste para reordenar" className="touch-none cursor-grab rounded p-0.5 text-[var(--faint)] hover:bg-[var(--card-soft)] active:cursor-grabbing"><GripVertical className="h-4 w-4" /></button>
                   {(() => { const b = brandForAccount(a); const generic = !b.domain && (a.type === "cash" || a.type === "wallet"); return <BrandLogo domain={b.domain} name={b.domain ? b.name : a.name} color={b.color || a.color} size={36} generic={generic} />; })()}
                   <div>
                     <p className="text-sm font-semibold leading-none">{a.name}</p>
@@ -90,10 +108,11 @@ export default function ContasPage() {
                   {a.is_active ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />} {a.is_active ? "Desativar" : "Ativar"}
                 </Button>
               </div>
-            </div>
+              </>}
+            </AccountReorderItem>
           );
         })}
-      </div>
+      </Reorder.Group>
 
       {accounts.length === 0 && (
         <div className="rounded-[18px] border border-dashed border-[var(--border-strong)] bg-[var(--card-soft)] px-5 py-8 text-center text-[13px] text-[var(--muted-foreground)]">

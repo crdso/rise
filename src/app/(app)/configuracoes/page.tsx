@@ -56,18 +56,12 @@ type SectionId =
   | "dados"
   | "auditoria";
 
-const SECTIONS: Array<{ id: SectionId; label: string; icon: typeof Palette }> = [
-  { id: "aparencia", label: "Aparência", icon: Palette },
-  { id: "painel", label: "Painel", icon: LayoutGrid },
-  { id: "financas", label: "Finanças", icon: Wallet },
-  { id: "escola", label: "Escola", icon: GraduationCap },
-  { id: "lembretes", label: "Lembretes", icon: Bell },
-  { id: "notificacoes", label: "Notificações", icon: Bell },
-  { id: "assistente", label: "Assistente", icon: Bot },
-  { id: "integracoes", label: "Integrações", icon: Plug },
-  { id: "seguranca", label: "Segurança", icon: Shield },
-  { id: "dados", label: "Dados", icon: Database },
-  { id: "auditoria", label: "Auditoria", icon: ScrollText },
+const SECTION_GROUPS: Array<{ label: string; items: Array<{ id: SectionId; label: string; icon: typeof Palette }> }> = [
+  { label: "Personalização", items: [{ id: "aparencia", label: "Aparência", icon: Palette }, { id: "painel", label: "Painel", icon: LayoutGrid }] },
+  { label: "Organização", items: [{ id: "financas", label: "Finanças", icon: Wallet }, { id: "escola", label: "Escola", icon: GraduationCap }, { id: "lembretes", label: "Lembretes", icon: Bell }, { id: "notificacoes", label: "Notificações", icon: Bell }] },
+  { label: "Inteligência e conexões", items: [{ id: "assistente", label: "Assistente", icon: Bot }, { id: "integracoes", label: "Integrações", icon: Plug }] },
+  { label: "Privacidade e segurança", items: [{ id: "seguranca", label: "Segurança", icon: Shield }, { id: "dados", label: "Dados", icon: Database }] },
+  { label: "Atividade", items: [{ id: "auditoria", label: "Auditoria", icon: ScrollText }] },
 ];
 
 type Integrations = {
@@ -79,10 +73,12 @@ type Integrations = {
   gemini: boolean;
   twilio: boolean;
 };
+type AssistantMetrics = { provider: string; model: string; today: number; month: number; successRate: number | null; averageLatency: number | null; lastUsedAt: string | null };
 
 export default function ConfiguracoesPage() {
   const [section, setSection] = useState<SectionId>("aparencia");
   const [integrations, setIntegrations] = useState<Integrations | null>(null);
+  const [assistantMetrics, setAssistantMetrics] = useState<AssistantMetrics | null>(null);
   const { push } = useToast();
   const router = useRouter();
 
@@ -108,6 +104,10 @@ export default function ConfiguracoesPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/settings/assistant").then((r) => (r.ok ? r.json() : null)).then((j) => j?.data && setAssistantMetrics(j.data as AssistantMetrics)).catch(() => {});
   }, []);
 
   const exportData = () => {
@@ -159,8 +159,11 @@ export default function ConfiguracoesPage() {
         {/* trilha de seções: vertical no desktop, rolável no mobile */}
         <nav className="lg:sticky lg:top-[72px] lg:self-start">
           <div className="-mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto no-scrollbar">
-            <div className="flex lg:flex-col gap-1 min-w-max lg:min-w-0">
-              {SECTIONS.map((s) => {
+            <div className="flex lg:flex-col gap-4 lg:gap-3 min-w-max lg:min-w-0">
+              {SECTION_GROUPS.map((group) => (
+                <div key={group.label} className="space-y-1">
+                  <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">{group.label}</p>
+                  {group.items.map((s) => {
                 const active = section === s.id;
                 return (
                   <button
@@ -177,7 +180,9 @@ export default function ConfiguracoesPage() {
                     {s.label}
                   </button>
                 );
-              })}
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         </nav>
@@ -186,7 +191,7 @@ export default function ConfiguracoesPage() {
           {/* ---------------- APARÊNCIA ---------------- */}
           {section === "aparencia" && (
             <>
-              <SettingsSection title="Tema" description="O RISE é dark-only. Não existe modo claro.">
+              <SettingsSection title="Tema" description="Escolha o visual do RISE.">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {themeOrder.map((id) => {
                     const active = theme === id;
@@ -215,7 +220,7 @@ export default function ConfiguracoesPage() {
                 </div>
               </SettingsSection>
 
-              <SettingsSection title="Tema personalizado" description="Gradientes escuros que respeitam a legibilidade do RISE.">
+              <SettingsSection title="Tema personalizado" description="Crie seu gradiente.">
                 <CustomThemeEditor />
               </SettingsSection>
 
@@ -313,7 +318,7 @@ export default function ConfiguracoesPage() {
               <SettingsPanel>
                 <SettingsRow
                   label="Atrasados"
-                  hint="Calculados na hora pela passagem do tempo — não dependem de nenhuma rotina agendada."
+                  hint="Aparecem quando passam do vencimento."
                 />
                 <SettingsRow
                   label="Recorrência"
@@ -329,7 +334,7 @@ export default function ConfiguracoesPage() {
           {section === "notificacoes" && (
             <SettingsSection
               title="Notificações"
-              description="O que aparece no sino. Tudo é derivado dos seus dados — nada é inventado."
+              description="Escolha o que aparece no sino."
             >
               <SettingsPanel>
                 <SettingsRow
@@ -382,34 +387,21 @@ export default function ConfiguracoesPage() {
 
           {/* ---------------- ASSISTENTE ---------------- */}
           {section === "assistente" && (
-            <SettingsSection title="Assistente" description="Interpretação de texto no Adicionar rápido.">
-              <SettingsPanel>
-                <SettingsRow
-                  label="Provedor de IA"
-                  hint={
-                    integrations?.openai || integrations?.gemini
-                      ? "Chave configurada no servidor."
-                      : "Nenhuma chave configurada. O interpretador roda em modo local de demonstração."
-                  }
-                  control={
-                    <StatusPill
-                      ok={!!(integrations?.openai || integrations?.gemini)}
-                      okLabel="Configurado"
-                      offLabel="Não configurado"
-                    />
-                  }
-                />
-                <SettingsRow
-                  label="Onde a chave fica"
-                  hint="Sempre no servidor. Nenhuma chave de IA é exposta ao navegador."
-                />
-              </SettingsPanel>
+            <SettingsSection title="Assistente" description="Resumo do uso no Adicionar rápido.">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ["Modelo ativo", assistantMetrics?.model ?? "Carregando"], ["Provedor", assistantMetrics?.provider ?? ""],
+                  ["Uso hoje", `${assistantMetrics?.today ?? 0} interpretações`], ["Uso este mês", `${assistantMetrics?.month ?? 0} interpretações`],
+                  ["Taxa de sucesso", assistantMetrics?.successRate == null ? "Sem dados" : `${assistantMetrics.successRate}%`], ["Tempo médio", assistantMetrics?.averageLatency == null ? "Sem dados" : `${(assistantMetrics.averageLatency / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} s`],
+                ].map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3"><p className="text-[10.5px] uppercase tracking-[0.07em] text-[var(--faint)]">{label}</p><p className="mt-1 text-[13px] font-semibold truncate">{value}</p></div>)}
+              </div>
+              <p className="text-[12px] text-[var(--muted-foreground)]">{assistantMetrics?.lastUsedAt ? `Última utilização: ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(assistantMetrics.lastUsedAt))}` : "Ainda não houve interpretações."}</p>
             </SettingsSection>
           )}
 
           {/* ---------------- INTEGRAÇÕES ---------------- */}
           {section === "integracoes" && (
-            <SettingsSection title="Integrações" description="Status de configuração. Nenhum valor de chave é exibido.">
+            <SettingsSection title="Integrações" description="Serviços conectados ao RISE.">
               <SettingsPanel>
                 <SettingsRow
                   label="Supabase"
@@ -417,18 +409,18 @@ export default function ConfiguracoesPage() {
                   control={<StatusPill ok={!!integrations?.supabase} okLabel="Conectado" offLabel="Modo demonstração" />}
                 />
                 <SettingsRow
-                  label="Chave secreta"
-                  hint="Necessária apenas em rotinas administrativas e auditoria no servidor"
+                  label="Recursos avançados"
+                  hint="Auditoria e automações"
                   control={<StatusPill ok={!!integrations?.supabaseSecretKey} okLabel="Configurada" offLabel="Ausente" />}
                 />
                 <SettingsRow
                   label="Brandfetch"
-                  hint="Primeiro provedor de logos (chave no servidor)"
+                  hint="Logos de instituições"
                   control={<StatusPill ok={!!integrations?.brandfetch} okLabel="Configurado" offLabel="Não configurado" />}
                 />
                 <SettingsRow
                   label="Logo.dev"
-                  hint="Segundo provedor de logos (token público)"
+                  hint="Logos de instituições"
                   control={<StatusPill ok={!!integrations?.logodev} okLabel="Configurado" offLabel="Não configurado" />}
                 />
                 <SettingsRow
@@ -448,14 +440,14 @@ export default function ConfiguracoesPage() {
                   label="Modo de acesso"
                   hint={
                     isDemo
-                      ? "Demonstração: os dados ficam apenas neste navegador."
-                      : "Supabase Auth com e-mail e senha. Não há cadastro público."
+                      ? "Explore o RISE sem entrar."
+                      : "Acesso por e-mail e senha."
                   }
                   control={<StatusPill ok={!isDemo} okLabel="Autenticado" offLabel="Demonstração" />}
                 />
                 <SettingsRow
-                  label="Isolamento dos dados"
-                  hint="RLS por usuário no banco: leitura só das próprias linhas, e escrita apenas por funções auditadas que resolvem o usuário no servidor."
+                  label="Sua conta"
+                  hint="Seus dados ficam disponíveis apenas para sua sessão."
                 />
                 <SettingsRow
                   label="Encerrar sessão"
@@ -482,14 +474,6 @@ export default function ConfiguracoesPage() {
                     </Button>
                   }
                 />
-                <SettingsRow
-                  label="Onde os dados vivem"
-                  hint={
-                    isDemo
-                      ? "Modo demonstração: tudo em localStorage, neste navegador. Nada sai do dispositivo."
-                      : "Modo Supabase: o servidor é a fonte da verdade e o cache local é limpo a cada sessão."
-                  }
-                />
               </SettingsPanel>
             </SettingsSection>
           )}
@@ -505,10 +489,6 @@ export default function ConfiguracoesPage() {
                   icon={<ScrollText className="h-4 w-4" />}
                 />
               </SettingsPanel>
-              <p className="text-[12px] text-[var(--muted-foreground)]">
-                O registro é imutável: só as funções do servidor escrevem nele, e a interface não oferece edição nem
-                exclusão.
-              </p>
             </SettingsSection>
           )}
         </div>

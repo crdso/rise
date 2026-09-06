@@ -30,7 +30,7 @@ export const DEFAULT_WIDGETS: WidgetId[] = [
 ];
 
 export const WIDGET_META: Record<WidgetId, { title: string; desc: string; span: "wide" | "narrow" }> = {
-  spend: { title: "Gastos do mês", desc: "Total, comparação e tendência", span: "wide" },
+  spend: { title: "Finanças", desc: "Saldo, gastos e tendência", span: "wide" },
   today: { title: "Hoje", desc: "Eventos e lembretes do dia", span: "narrow" },
   categories: { title: "Categorias", desc: "Para onde o dinheiro foi", span: "narrow" },
   upcoming: { title: "Próximos dias", desc: "O que vem pela frente", span: "narrow" },
