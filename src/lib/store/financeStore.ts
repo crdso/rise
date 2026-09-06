@@ -135,7 +135,7 @@ export function calcAccountBalance(acc: Account, txs: Transaction[]) {
 export function spendingByCategory(transactions: Transaction[], categories: Category[], month?: Date) {
   // Agrupamento pelo mes civil de Sao Paulo (nao pelo fuso do dispositivo).
   const monthKey = saoPauloMonthKey(month || new Date());
-  const filtered = transactions.filter(t => t.type === "expense" && saoPauloMonthKey(t.occurred_at) === monthKey);
+  const filtered = transactions.filter(t => !t.transfer_id && t.type === "expense" && saoPauloMonthKey(t.occurred_at) === monthKey);
   const total = filtered.reduce((s,t)=>s+t.amount,0);
   const byCat: Record<string, { name: string; amount: number; pct: number }> = {};
   for (const t of filtered) {

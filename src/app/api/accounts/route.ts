@@ -1,3 +1,4 @@
+import { financialError } from "@/lib/finance/errors";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -10,7 +11,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { data, error } = await supabase.from("accounts").select("*").eq("user_id", user.id).order("sort_order");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { const safe = financialError(error); return NextResponse.json({ error: safe.error }, { status: safe.status }); }
   return NextResponse.json({ data });
 }
 
@@ -36,9 +37,8 @@ export async function POST(req: Request) {
   });
 
   if (error) {
-    // Inclui falhas de configuração da chave administrativa usada pela auditoria.
-    const msg = error.message.includes("service_role") || error.message.includes("SUPABASE") ? "Erro de configuração: SUPABASE_SECRET_KEY ausente" : error.message;
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const safe = financialError(error);
+    return NextResponse.json({ error: safe.error }, { status: safe.status });
   }
   return NextResponse.json({ data });
 }

@@ -1,3 +1,4 @@
+import { financialError } from "@/lib/finance/errors";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -10,6 +11,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const { data, error } = await supabase.from("debt_installments").select("*").eq("debt_id", id).eq("user_id", user.id).order("installment_number");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { const safe = financialError(error); return NextResponse.json({ error: safe.error }, { status: safe.status }); }
   return NextResponse.json({ data });
 }

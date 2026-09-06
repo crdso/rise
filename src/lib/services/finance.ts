@@ -2,6 +2,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { useFinanceStore } from "@/lib/store/financeStore";
 import type { Account, Category, Transaction } from "@/types/finance";
 import { FINANCIAL_BRANDS, inferBrandKey } from "@/lib/brands/registry";
+import type { TransferInput } from "@/lib/validators/finance";
 
 function uid() { return crypto.randomUUID(); }
 
@@ -40,6 +41,15 @@ function demoUpdateAccount(id: string, patch: Partial<Account>): Account | null 
 }
 
 export const financeService = {
+  async createTransfer(data: TransferInput, idempotencyKey: string) {
+    const result = await api<{ transfer: { id: string }; transactions: Transaction[] }>("/api/transfers", {
+      method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(data),
+    });
+    const store = useFinanceStore.getState();
+    const ids = new Set(result.transactions.map(t => t.id));
+    store.setTransactions([...result.transactions, ...store.transactions.filter(t => !ids.has(t.id))]);
+    return result;
+  },
   // Accounts - unified
   listAccounts(): Account[] {
     return useFinanceStore.getState().accounts;

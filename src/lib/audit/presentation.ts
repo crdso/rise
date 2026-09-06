@@ -48,6 +48,7 @@ export const ORIGIN_ICON: Record<AuditOrigin, LucideIcon> = {
 };
 
 export const ENTITY_LABEL: Record<string, string> = {
+  account_transfer: "Transferência",
   transaction: "Transação",
   account: "Conta",
   category: "Categoria",
@@ -63,6 +64,7 @@ export const ENTITY_LABEL: Record<string, string> = {
 };
 
 const ENTITY_ICON: Record<string, LucideIcon> = {
+  account_transfer: Wallet,
   transaction: ReceiptText,
   account: Landmark,
   category: Tag,

@@ -24,6 +24,7 @@ export type Category = {
 
 export type TxType = "expense" | "income";
 export type Transaction = {
+  transfer_id?: string | null;
   id: string;
   account_id: string | null;
   category_id: string | null;

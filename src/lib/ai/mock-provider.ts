@@ -10,6 +10,13 @@ export class MockAIProvider implements AIProvider {
     const amount = amountMatch ? Number(amountMatch[1].replace(",", ".")) : null;
     const today = context.now;
 
+    if (/\b(mandei|transferi|passei|joguei|movi)\b/.test(lower)) {
+      const accounts = input.match(/\b(?:do|da|de)\s+(.+?)\s+(?:pro|pra|para(?:\s+[oa])?|no|na)\s+(.+?)(?:\s+(?:hoje|agora))?\s*$/i);
+      return { intent: "transfer", confidence: accounts && amount ? 0.85 : 0.5,
+        missingFields: [...(amount ? [] : ["amount"]), ...(accounts ? [] : ["fromAccount", "toAccount"])], clarification: null,
+        data: { amount, fromAccount: accounts?.[1] ?? null, toAccount: accounts?.[2] ?? null, occurredAt: today, notes: null } };
+    }
+
     if (/(gastei|paguei|comprei)/.test(lower)) return { intent: "transaction", confidence: 0.72, missingFields: amount ? [] : ["amount"], clarification: null, data: { type: "expense", amount, description: input, occurredAt: lower.includes("hoje") ? today : null, account: null, category: lower.includes("almoç") || lower.includes("lanche") ? "Alimentação" : null, paymentMethod: null, notes: null } };
     if (/(recebi|receber)/.test(lower)) return { intent: "transaction", confidence: 0.7, missingFields: amount ? [] : ["amount"], clarification: null, data: { type: "income", amount, description: input, occurredAt: null, account: null, category: null, paymentMethod: null, notes: null } };
     if (/(lembra|lembrete)/.test(lower)) return { intent: "reminder", confidence: 0.68, missingFields: [], clarification: null, data: { title: input, dueAt: null, notes: null, priority: "medium", recurrence: "none" } };

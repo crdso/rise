@@ -6,6 +6,7 @@ import { OpenAIProvider } from "@/lib/ai/openai-provider";
 import { createClient } from "@/lib/supabase/server";
 import { FINANCIAL_BRANDS, normalizeName } from "@/lib/brands/registry";
 import type { AccountResolution, ParsedIntent } from "@/lib/ai/types";
+import { resolveTransferAccount } from "@/lib/ai/transfer-accounts";
 
 const requestSchema = z.object({ input: z.string().trim().min(1).max(1_000) }).strict();
 const requestsByUser = new Map<string, number[]>();
@@ -42,6 +43,7 @@ function resolveAccount(name: string, accounts: Array<{ id: string; name: string
 }
 
 function normalizeTransaction(result: ParsedIntent, input: string, now: string): ParsedIntent {
+  if (result.intent === "transfer") return { ...result, missingFields: result.missingFields.filter(field => field !== "occurredAt"), data: { ...result.data, occurredAt: result.data.occurredAt || now } };
   if (result.intent !== "transaction") return result;
   const lower = input.toLowerCase();
   const isIncome = result.data.type === "income";
@@ -81,6 +83,14 @@ export async function POST(request: Request) {
       .replace(/\bont\b/gi, "ontem");
     const result = normalizeTransaction(await new AIParserService(provider).parse(parseInput, { now, timezone: "America/Sao_Paulo" }), body.data.input, now);
     let accountResolution: AccountResolution = null;
+    if (result.intent === "transfer") {
+      const { data: accounts, error } = await supabase!.from("accounts").select("id,name").eq("user_id", userId).eq("is_active", true);
+      if (error) throw error;
+      const fromAccountResolution = resolveTransferAccount(result.data.fromAccount, accounts ?? []);
+      const toAccountResolution = resolveTransferAccount(result.data.toAccount, accounts ?? []);
+      await record("success", result);
+      return NextResponse.json({ data: { ...result, fromAccountResolution, toAccountResolution }, provider: provider.name });
+    }
     if (result.intent === "transaction" && result.data.account) {
       const { data: accounts } = await supabase!.from("accounts").select("id,name").eq("user_id", userId).eq("is_active", true);
       accountResolution = resolveAccount(result.data.account, accounts ?? []);

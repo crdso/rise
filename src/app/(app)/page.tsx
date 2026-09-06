@@ -4,6 +4,7 @@ import { motion, Reorder, useDragControls } from "framer-motion";
 import { LayoutGrid, Check, RotateCcw, Maximize2, Minimize2, Sparkles, Loader2 } from "lucide-react";
 import { greeting, headerDate } from "@/lib/utils";
 import { useFinanceStore } from "@/lib/store/financeStore";
+import { useFinanceSummary } from "@/lib/finance/useFinanceSummary";
 import { useDebtStore, debtRemaining, debtStatus } from "@/lib/store/debtStore";
 import { useCalendarStore } from "@/lib/store/calendarStore";
 import { useReminderStore, remindersForToday, remindersUpcoming, reminderViewStatus } from "@/lib/store/reminderStore";
@@ -62,6 +63,7 @@ export default function Dashboard() {
   const isDemo = !isSupabaseConfigured();
   const todayKey = saoPauloTodayKey();
   const monthKey = currentMonthKey();
+  const financeSummary = useFinanceSummary(monthKey);
 
   const todayLabel = useMemo(() => headerDate(new Date()), []);
   const greet = useMemo(() => greeting("Ezequias"), []);
@@ -72,17 +74,17 @@ export default function Dashboard() {
     const previous = monthStats(transactions, previousMonthKey(monthKey));
     const { total, slices } = categoryBreakdown(transactions, categories, monthKey);
     return {
-      expense: current.expense,
-      income: current.income,
+      expense: financeSummary?.month.expense ?? current.expense,
+      income: financeSummary?.month.income ?? current.income,
       pct: pctChange(current.expense, previous.expense),
       series: lastNDays(transactions, 30, "expense"),
       slices,
       categoryTotal: total,
       topCategory: slices[0]?.name ?? null,
-      totalBalance: totalBalance(accounts, transactions),
+      totalBalance: financeSummary?.totalBalance ?? totalBalance(accounts, transactions),
       hasData: transactions.length > 0,
     };
-  }, [accounts, transactions, categories, monthKey]);
+  }, [accounts, transactions, categories, monthKey, financeSummary]);
 
   const todayEntries = useMemo<AgendaEntry[]>(() => {
     const evs: AgendaEntry[] = events

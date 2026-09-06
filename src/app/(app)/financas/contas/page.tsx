@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/toast";
 import { totalBalance } from "@/lib/finance/analytics";
 import { ACCOUNT_TYPE_LABEL } from "@/components/rise/AccountTile";
 import { currentMonthKey } from "@/lib/finance/analytics";
+import { useFinanceSummary } from "@/lib/finance/useFinanceSummary";
 
 function AccountReorderItem({ account, onDragEnd, children }: { account: import("@/types/finance").Account; onDragEnd: () => void; children: (startDrag: (event: React.PointerEvent) => void) => React.ReactNode }) {
   const controls = useDragControls();
@@ -26,14 +27,14 @@ export default function ContasPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [orderedAccounts, setOrderedAccounts] = useState(accounts);
-  const [accountBalances, setAccountBalances] = useState<Record<string, number> | null>(null);
+  const summary = useFinanceSummary(currentMonthKey());
+  const accountBalances = summary?.accountBalances;
+  // Preserve the existing drag-order synchronization with server snapshots.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setOrderedAccounts(accounts), [accounts]);
-  useEffect(() => {
-    fetch(`/api/finance/summary?month=${currentMonthKey()}`).then((response) => response.ok ? response.json() : null).then((payload) => setAccountBalances(payload?.data?.accountBalances ?? null)).catch(() => setAccountBalances(null));
-  }, []);
   const initial = editing ? accounts.find(a=>a.id===editing) || null : null;
   const activeAccounts = useMemo(() => accounts.filter((account) => account.is_active), [accounts]);
-  const activeTotal = useMemo(() => totalBalance(accounts, transactions), [accounts, transactions]);
+  const activeTotal = summary?.totalBalance ?? totalBalance(accounts, transactions);
 
   const handleSave = async (data: { name: string; type: import("@/types/finance").AccountType; color: string; initial_balance: number }) => {
     try {

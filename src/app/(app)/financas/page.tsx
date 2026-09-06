@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/rise/EmptyState";
 import { useFinanceStore } from "@/lib/store/financeStore";
 import { financeService } from "@/lib/services/finance";
+import { useFinanceSummary } from "@/lib/finance/useFinanceSummary";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { TransactionDialog } from "@/components/rise/TransactionDialog";
 import { FinanceNav } from "@/components/rise/FinanceNav";
@@ -57,16 +58,13 @@ export default function FinancasPage() {
   const [defaultType, setDefaultType] = useState<"expense" | "income">("expense");
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [minMonth, setMinMonth] = useState(thisMonth);
-  const [summary, setSummary] = useState<{ totalBalance: number; accountBalances: Record<string, number>; month: { income: number; expense: number; count: number } } | null>(null);
+  const summary = useFinanceSummary(monthKey);
 
   useEffect(() => {
     fetch("/api/finance/meta").then((response) => response.ok ? response.json() : null).then((payload) => {
       if (payload?.data?.createdAt) setMinMonth(saoPauloMonthKey(payload.data.createdAt));
     }).catch(() => {});
   }, []);
-  useEffect(() => {
-    fetch(`/api/finance/summary?month=${monthKey}`).then((response) => response.ok ? response.json() : null).then((payload) => setSummary(payload?.data ?? null)).catch(() => setSummary(null));
-  }, [monthKey]);
 
   const stats = useMemo(() => {
     const current = monthStats(transactions, monthKey);
@@ -82,8 +80,8 @@ export default function FinancasPage() {
   }, [transactions, categories, monthKey]);
 
   const filtered = useMemo(() => {
-    let list = transactionsInMonth(transactions, monthKey);
-    if (type !== "all") list = list.filter((t) => t.type === type);
+    let list = transactionsInMonth(transactions, monthKey, true);
+    if (type !== "all") list = list.filter((t) => !t.transfer_id && t.type === type);
     if (accountId) list = list.filter((t) => t.account_id === accountId);
     if (q.trim()) {
       const needle = q.toLowerCase();
@@ -359,7 +357,7 @@ export default function FinancasPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-[13.5px] font-medium truncate">{t.description || cat?.name || "Sem descrição"}</p>
                   <div className="text-[11.5px] text-[var(--muted-foreground)] truncate flex items-center gap-1.5">
-                    {cat?.name && <span>{cat.name}</span>}
+                    {t.transfer_id ? <span>Transferência · {expense ? "Saída" : "Entrada"}</span> : cat?.name && <span>{cat.name}</span>}
                     <span className="text-[var(--faint)]">·</span>
                     <span>{formatDate(t.occurred_at, { withTime: true })}</span>
                     {acc && brand && (
@@ -382,7 +380,7 @@ export default function FinancasPage() {
                   {expense ? "−" : "+"} {formatBRL(t.amount)}
                 </p>
 
-                <div className="flex gap-1 shrink-0">
+                {!t.transfer_id && <div className="flex gap-1 shrink-0">
                   <button
                     onClick={() => {
                       setEditId(t.id);
@@ -401,7 +399,7 @@ export default function FinancasPage() {
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
-                </div>
+                </div>}
               </div>
             );
           })}

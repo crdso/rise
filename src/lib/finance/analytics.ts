@@ -25,8 +25,8 @@ export function previousMonthKey(monthKey: string): string {
   return `${d.y}-${String(d.m).padStart(2, "0")}`;
 }
 
-export function transactionsInMonth(txs: Transaction[], monthKey: string): Transaction[] {
-  return txs.filter((t) => saoPauloMonthKey(t.occurred_at) === monthKey);
+export function transactionsInMonth(txs: Transaction[], monthKey: string, includeTransfers = false): Transaction[] {
+  return txs.filter((t) => (includeTransfers || !t.transfer_id) && saoPauloMonthKey(t.occurred_at) === monthKey);
 }
 
 export function monthStats(txs: Transaction[], monthKey: string): MonthStats {
@@ -80,7 +80,7 @@ export function dailySeries(
 ): DayPoint[] {
   const totals = new Map<string, number>();
   for (const t of txs) {
-    if (t.type !== type) continue;
+    if (t.transfer_id || t.type !== type) continue;
     const k = saoPauloDateKey(t.occurred_at);
     if (k < fromKey || k > toKey) continue;
     totals.set(k, (totals.get(k) || 0) + t.amount);

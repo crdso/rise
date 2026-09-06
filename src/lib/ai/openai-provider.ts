@@ -16,12 +16,13 @@ const strictObject = (properties: Record<string, unknown>) => ({ type: "object",
 // Responses Structured Outputs requires an object at the schema root. The
 // intent-specific union lives inside data and is checked again by Zod below.
 const responseSchema = strictObject({
-  intent: { type: "string", enum: ["transaction", "debt", "reminder", "event", "school_task", "important", "unknown"] },
+  intent: { type: "string", enum: ["transaction", "transfer", "debt", "reminder", "event", "school_task", "important", "unknown"] },
   confidence: { type: "number", minimum: 0, maximum: 1 },
   missingFields: { type: "array", items: { type: "string" }, maxItems: 8 },
   clarification: nullableText,
   data: {
     anyOf: [
+      strictObject({ amount: nullableNumber, fromAccount: nullableText, toAccount: nullableText, occurredAt: nullableDateTime, notes: nullableText }),
       strictObject({ type: nullableEnum(["expense", "income"]), amount: nullableNumber, description: nullableText, occurredAt: nullableDateTime, account: nullableText, category: nullableText, paymentMethod: nullableText, notes: nullableText }),
       strictObject({ kind: nullableEnum(["owed", "receivable"]), person: nullableText, amount: nullableNumber, description: nullableText, dueDate: { anyOf: [{ type: "string", format: "date" }, { type: "null" }] }, notes: nullableText }),
       strictObject({ title: nullableText, dueAt: nullableDateTime, notes: nullableText, priority: nullableEnum(["low", "medium", "high"]), recurrence: nullableEnum(["none", "daily", "weekly", "monthly"]) }),
@@ -72,7 +73,7 @@ export class OpenAIProvider implements AIProvider {
           store: false,
           max_output_tokens: 900,
           input: [
-            { role: "developer", content: "You extract one RISE action from Brazilian Portuguese. Return only the requested JSON. Never execute actions. Timezone is America/Sao_Paulo. Current local date/time is " + context.now + ". Informal Brazilian dates: hj means hoje, agr means agora, ont means ontem, and amanha means amanhã; resolve weekday names such as sexta and sábado from the current date. For transactions, use the current local date-time when no date is specified; do not list occurredAt as missing. For reminders, events, and school tasks do not invent dates or times. Use ISO 8601 strings with -03:00 offsets for date-times and YYYY-MM-DD for debt due dates. For generic income, use description Receita (or Salário when explicit) and do not infer expense categories such as Alimentação. Set every unavailable value to null, list required missing fields, and use unknown plus a clarification for ambiguous text." },
+            { role: "developer", content: "You extract one RISE action from Brazilian Portuguese. Return only the requested JSON. Never execute actions. Timezone is America/Sao_Paulo. Current local date/time is " + context.now + ". Informal Brazilian dates: hj means hoje, agr means agora, ont means ontem, and amanha means amanhã; resolve weekday names such as sexta and sábado from the current date. Use intent transfer for movements between two accounts owned by the user, including mandei 233 do inter pro mercado pago, transferi 100 do nubank pro inter, passei 50 reais do BB pra carteira, joguei 200 do mercado pago no nubank, movi 300 da conta X para conta Y. Extract fromAccount and toAccount separately, preserve their names, and never classify an internal transfer as expense or income. If ownership or direction is ambiguous, ask for clarification. For transactions and transfers, use the current local date-time when no date is specified; do not list occurredAt as missing. For reminders, events, and school tasks do not invent dates or times. Use ISO 8601 strings with -03:00 offsets for date-times and YYYY-MM-DD for debt due dates. For generic income, use description Receita (or Salário when explicit) and do not infer expense categories such as Alimentação. Set every unavailable value to null, list required missing fields, and use unknown plus a clarification for ambiguous text." },
             { role: "user", content: input },
           ],
           text: { format: { type: "json_schema", name: "rise_intent", strict: true, schema: responseSchema } },

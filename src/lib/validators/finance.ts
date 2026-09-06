@@ -63,3 +63,12 @@ export type AccountInput = z.infer<typeof accountSchema>;
 export type AccountPatchInput = z.infer<typeof accountPatchSchema>;
 export type TransactionInput = z.infer<typeof transactionSchema>;
 export type TransactionPatchInput = z.infer<typeof transactionPatchSchema>;
+
+export const transferSchema = z.object({
+  from_account_id: z.string().uuid(),
+  to_account_id: z.string().uuid(),
+  amount: z.number().positive().max(999999999).multipleOf(0.01),
+  occurred_at: z.string().datetime({ offset: true }),
+  notes: z.string().max(500).nullable(),
+}).strict().refine(value => value.from_account_id !== value.to_account_id, { message: "Escolha contas diferentes." });
+export type TransferInput = z.infer<typeof transferSchema>;

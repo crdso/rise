@@ -12,6 +12,11 @@ const base = {
 export const parsedIntentSchema = z.discriminatedUnion("intent", [
   z.object({
     ...base,
+    intent: z.literal("transfer"),
+    data: z.object({ amount: z.number().positive().nullable(), fromAccount: nullableText, toAccount: nullableText, occurredAt: nullableDateTime, notes: nullableText }).strict(),
+  }).strict(),
+  z.object({
+    ...base,
     intent: z.literal("transaction"),
     data: z.object({
       type: z.enum(["expense", "income"]).nullable(), amount: z.number().positive().nullable(), description: nullableText,
@@ -50,4 +55,5 @@ export type ParsedIntent = z.infer<typeof parsedIntentSchema>;
 export type IntentType = ParsedIntent["intent"];
 export type ParseContext = { now: string; timezone: "America/Sao_Paulo" };
 export type AccountResolution = { status: "existing"; id: string; name: string } | { status: "create"; name: string; color: string | null; brandDomain: string | null; brandKey: string | null } | null;
-export type ResolvedParsedIntent = ParsedIntent & { accountResolution?: AccountResolution };
+export type TransferAccountResolution = { status: "existing"; id: string; name: string } | { status: "missing" | "ambiguous"; name: string };
+export type ResolvedParsedIntent = ParsedIntent & { accountResolution?: AccountResolution; fromAccountResolution?: TransferAccountResolution; toAccountResolution?: TransferAccountResolution };

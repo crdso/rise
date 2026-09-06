@@ -1,3 +1,4 @@
+import { financialError } from "@/lib/finance/errors";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -22,8 +23,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   });
 
   if (error) {
-    if (error.message.includes("not found")) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const safe = financialError(error);
+    return NextResponse.json({ error: safe.error }, { status: safe.status });
   }
   return NextResponse.json({ data });
 }

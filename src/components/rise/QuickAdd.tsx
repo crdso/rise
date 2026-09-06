@@ -61,6 +61,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
 
   const openParsed = () => {
     if (!parsed) return;
+    if (parsed.intent === "transfer") { setParsed(null); setOperationKey(null); return; }
     if (parsed.intent === "transaction") setTxOpen(parsed.data.type || "expense");
     if (parsed.intent === "debt") setDebtOpen(true);
     if (parsed.intent === "event") setEventOpen(true);
@@ -73,15 +74,25 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
   const previewValues = parsed && parsed.intent !== "unknown"
     ? Object.entries(parsed.data).filter(([, value]) => value !== null && value !== false && value !== "")
     : [];
-  const transactionRows = parsed?.intent === "transaction" ? [
-    ["Tipo", parsed.data.type === "income" ? "Receita" : parsed.data.type === "expense" ? "Gasto" : "Não informado"],
-    ["Valor", parsed.data.amount ? formatBRL(parsed.data.amount) : "Não informado"],
-    ["Conta", parsed.accountResolution?.name || "Não informada"],
-    ["Data", parsed.data.occurredAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeZone: "America/Sao_Paulo" }).format(new Date(parsed.data.occurredAt)) : "Não informada"],
-    ["Descrição", parsed.data.description || "Não informada"],
-  ] : [];
-  const canQuickConfirm = parsed?.intent === "transaction" && parsed.confidence >= 0.75 && parsed.missingFields.length === 0 && !!parsed.data.type && !!parsed.data.amount && !!parsed.data.description && !!parsed.data.occurredAt && !!parsed.accountResolution && !!operationKey;
+  const canConfirmTransfer = parsed?.intent === "transfer" && parsed.confidence >= 0.75 && parsed.missingFields.length === 0
+    && !!parsed.data.amount && !!parsed.data.occurredAt && !!operationKey
+    && parsed.fromAccountResolution?.status === "existing" && parsed.toAccountResolution?.status === "existing"
+    && parsed.fromAccountResolution.id !== parsed.toAccountResolution.id;
+  const canQuickConfirm = canConfirmTransfer || (parsed?.intent === "transaction" && parsed.confidence >= 0.75 && parsed.missingFields.length === 0 && !!parsed.data.type && !!parsed.data.amount && !!parsed.data.description && !!parsed.data.occurredAt && !!parsed.accountResolution && !!operationKey);
   const confirmTransaction = async () => {
+    if (parsed?.intent === "transfer") {
+      if (!canConfirmTransfer || !operationKey || confirming || parsed.fromAccountResolution?.status !== "existing" || parsed.toAccountResolution?.status !== "existing") return;
+      setConfirming(true); setConfirmError("");
+      try {
+        await financeService.createTransfer({ amount: parsed.data.amount!, from_account_id: parsed.fromAccountResolution.id,
+          to_account_id: parsed.toAccountResolution.id, occurred_at: parsed.data.occurredAt!, notes: parsed.data.notes }, operationKey);
+        push({ title: "Transferência registrada", desc: formatBRL(parsed.data.amount!) });
+        setParsed(null); setOperationKey(null); onClose();
+      } catch {
+        setConfirmError("Não foi possível registrar a transferência. Confira as contas e tente novamente.");
+      } finally { setConfirming(false); }
+      return;
+    }
     if (!parsed || parsed.intent !== "transaction" || !parsed.accountResolution || !operationKey || confirming) return;
     setConfirming(true);
     setConfirmError("");
@@ -89,7 +100,7 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
       await financeService.confirmTransactionWithAccount({ type: parsed.data.type!, amount: parsed.data.amount!, description: parsed.data.description!, account_id: null, account_name: parsed.accountResolution.name, account_color: parsed.accountResolution.status === "create" ? parsed.accountResolution.color : null, account_brand_domain: parsed.accountResolution.status === "create" ? parsed.accountResolution.brandDomain : null, account_brand_key: parsed.accountResolution.status === "create" ? parsed.accountResolution.brandKey : null, category_id: null, category_name: parsed.data.category, occurred_at: parsed.data.occurredAt!, notes: parsed.data.notes, payment_method: parsed.data.paymentMethod, is_recurring: false }, operationKey);
       push({ title: parsed.data.type === "income" ? "Receita adicionada" : "Gasto adicionado", desc: formatBRL(parsed.data.amount!) });
       setParsed(null); setOperationKey(null); onClose();
-    } catch (error) {
+    } catch {
       setConfirmError("Não foi possível salvar. Tente novamente.");
       push({ title: "Erro", desc: "Não foi possível confirmar a operação.", variant: "error" });
     } finally { setConfirming(false); }
@@ -128,7 +139,14 @@ export function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void
                       {parsed.clarification && <p className="mt-2 text-xs text-amber-300">{parsed.clarification}</p>}
                       {parsed.intent === "unknown" ? <p className="mt-2 text-xs text-[var(--muted-foreground)]">Escolha uma opção abaixo ou reformule o texto.</p> : (
                         <>
-                          {parsed.intent === "transaction" ? <>
+                          {parsed.intent === "transfer" ? <>
+                            <div className="mt-4"><p className="text-xs text-[var(--muted-foreground)]">Transferência</p><p className="text-xl font-semibold">{parsed.data.amount ? formatBRL(parsed.data.amount) : "Valor não informado"}</p></div>
+                            <p className="mt-3 text-sm font-medium">{parsed.fromAccountResolution?.name || parsed.data.fromAccount || "Origem não informada"} → {parsed.toAccountResolution?.name || parsed.data.toAccount || "Destino não informado"}</p>
+                            <p className="mt-2 text-xs">Data: {parsed.data.occurredAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeZone: "America/Sao_Paulo" }).format(new Date(parsed.data.occurredAt)) : "Não informada"}</p>
+                            <p className="mt-2 text-xs text-[var(--muted-foreground)]">Movimenta os saldos das contas sem alterar receitas ou gastos.</p>
+                            {[parsed.fromAccountResolution, parsed.toAccountResolution].map((account, index) => account?.status !== "existing" && <p role="alert" key={index} className="mt-2 text-xs text-amber-300">{account?.status === "ambiguous" ? `Há mais de uma conta para ${account.name}. Revise usando um nome sem ambiguidade.` : `Conta ${account?.name || (index === 0 ? "origem" : "destino")} não encontrada. Cadastre a conta antes de transferir.`}</p>)}
+                            {parsed.fromAccountResolution?.status === "existing" && parsed.toAccountResolution?.status === "existing" && parsed.fromAccountResolution.id === parsed.toAccountResolution.id && <p role="alert" className="mt-2 text-xs text-amber-300">Escolha contas diferentes para origem e destino.</p>}
+                          </> : parsed.intent === "transaction" ? <>
                             <div className="mt-4 flex items-center gap-3"><span className={`grid h-10 w-10 place-items-center rounded-xl ${parsed.data.type === "income" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--card-soft)] text-[var(--negative)]"}`}>{parsed.data.type === "income" ? <TrendingUp className="h-5 w-5" /> : <Wallet className="h-5 w-5" />}</span><div><p className="text-xs text-[var(--muted-foreground)]">{parsed.data.type === "income" ? "Receita" : "Gasto"}</p><p className="text-xl font-semibold tracking-tight">{parsed.data.amount ? formatBRL(parsed.data.amount) : "Valor não informado"}</p></div></div>
                             <div className="mt-4 grid gap-2 sm:grid-cols-3">
                               <div className="flex gap-2 rounded-xl bg-[var(--card-soft)] p-2.5"><Building2 className="mt-0.5 h-4 w-4 text-[var(--faint)]" /><div><p className="text-[10px] uppercase tracking-wide text-[var(--faint)]">Conta</p><p className="text-xs font-medium">{parsed.accountResolution?.name || "Não informada"}</p></div></div>
