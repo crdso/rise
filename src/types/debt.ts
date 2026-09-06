@@ -8,6 +8,7 @@ export type Debt = {
   description?: string | null;
   kind: DebtKind;
   amount: number; // total
+  paid_amount: number;
   due_date?: string | null; // date (YYYY-MM-DD)
   notes?: string | null;
   status: DebtStatus;

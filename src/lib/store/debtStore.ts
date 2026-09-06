@@ -79,7 +79,7 @@ export function debtPaidAmount(debtId: string, payments: DebtPayment[]) {
 }
 
 export function debtRemaining(debt: Debt, payments: DebtPayment[]) {
-  return Math.max(0, debt.amount - debtPaidAmount(debt.id, payments));
+  return Math.max(0, debt.amount - (debt.paid_amount ?? debtPaidAmount(debt.id, payments)));
 }
 
 export function installmentPaidAmount(installmentId: string, payments: DebtPayment[]) {
@@ -99,7 +99,7 @@ export function installmentStatus(installment: DebtInstallment, payments: DebtPa
 // Precedência igual à do SQL (debt_status na 007 + lógica parcelada na 008):
 // paid -> overdue -> partial -> pending
 export function debtStatus(debt: Debt, payments: DebtPayment[], installments?: DebtInstallment[]): "pending"|"partial"|"paid"|"overdue" {
-  const paid = debtPaidAmount(debt.id, payments);
+  const paid = debt.paid_amount ?? debtPaidAmount(debt.id, payments);
   const remaining = debt.amount - paid;
   if (remaining <= 0.005) return "paid";
   const today = saoPauloTodayKey();

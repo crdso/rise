@@ -108,7 +108,7 @@ export default function DividasPage() {
       ) : (
         <div className="space-y-3">
           {visible.map((d)=>{
-            const paid=debtPaidAmount(d.id, payments);
+            const paid=d.paid_amount ?? debtPaidAmount(d.id, payments);
             const remaining=debtRemaining(d,payments);
             const status=debtStatus(d,payments,installments);
             const pct=Math.min(100, Math.round((paid/d.amount)*100));

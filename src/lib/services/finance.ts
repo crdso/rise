@@ -97,7 +97,7 @@ export const financeService = {
   listTransactions(): Transaction[] {
     return useFinanceStore.getState().transactions;
   },
-  async createTransaction(data: Omit<Transaction, "id" | "created_at" | "updated_at">): Promise<Transaction> {
+  async createTransaction(data: Omit<Transaction, "id" | "created_at" | "updated_at">, idempotencyKey = crypto.randomUUID()): Promise<Transaction> {
     if (!isSupabaseConfigured()) {
       const now = new Date().toISOString();
       const tx: Transaction = { id: uid(), created_at: now, updated_at: now, ...data };
@@ -106,7 +106,7 @@ export const financeService = {
       useFinanceStore.getState().pushAudit({ id: uid(), actor: "Você", action: tx.type === "expense" ? "criou uma despesa" : "criou uma receita", entity: "transaction", entity_id: tx.id, after: { amount: tx.amount, category: cat?.name, type: tx.type }, origin: "web", created_at: now });
       return tx;
     }
-    const created = await api<Transaction>("/api/transactions", { method: "POST", body: JSON.stringify(data) });
+    const created = await api<Transaction>("/api/transactions", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(data) });
     useFinanceStore.getState().upsertTransaction(created);
     return created;
   },

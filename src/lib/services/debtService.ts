@@ -18,7 +18,7 @@ export const debtService = {
   async createDebt(data:{ person:string; description?:string|null; kind:"owed"|"receivable"; amount:number; due_date?:string|null; notes?:string|null; is_installment?:boolean; installments_count?:number|null; first_due_date?:string|null }): Promise<Debt>{
     if(!isSupabaseConfigured()){
       const now=new Date().toISOString();
-      const debt:Debt={ id:uid(), user_id:"demo", person:data.person.trim(), description:data.description?.trim()||null, kind:data.kind, amount:data.amount, due_date:data.due_date||null, notes:data.notes||null, status:"pending", is_installment:!!data.is_installment, installments_count:data.installments_count||null, archived_at:null, created_at:now, updated_at:now };
+      const debt:Debt={ id:uid(), user_id:"demo", person:data.person.trim(), description:data.description?.trim()||null, kind:data.kind, amount:data.amount, paid_amount:0, due_date:data.due_date||null, notes:data.notes||null, status:"pending", is_installment:!!data.is_installment, installments_count:data.installments_count||null, archived_at:null, created_at:now, updated_at:now };
       useDebtStore.getState().upsertDebt(debt);
       if(debt.is_installment && debt.installments_count && data.first_due_date){
         const per=Math.floor(debt.amount/debt.installments_count*100)/100;
@@ -62,7 +62,7 @@ export const debtService = {
     return updated;
   },
 
-  async addPayment(debtId:string, data:{ amount:number; notes?:string|null; create_transaction?:boolean; account_id?:string|null; transaction_category?:string|null; installment_id?:string|null }): Promise<DebtPayment>{
+  async addPayment(debtId:string, data:{ amount:number; notes?:string|null; create_transaction?:boolean; account_id?:string|null; transaction_category?:string|null; installment_id?:string|null }, idempotencyKey = crypto.randomUUID()): Promise<DebtPayment>{
     if(!isSupabaseConfigured()){
       const debt=useDebtStore.getState().debts.find(d=>d.id===debtId);
       if(!debt) throw new Error("debt not found");
@@ -90,7 +90,7 @@ export const debtService = {
       }
       return pay;
     }
-    const created=await api<DebtPayment>(`/api/debts/${debtId}/payments`,{ method:"POST", body:JSON.stringify(data)});
+    const created=await api<DebtPayment>(`/api/debts/${debtId}/payments`,{ method:"POST", headers:{ "Idempotency-Key":idempotencyKey }, body:JSON.stringify(data)});
     useDebtStore.getState().upsertPayment(created);
     if(created.transaction_id){
       try{ const { financeService } = await import("./finance"); await financeService.refreshFromServer(); }catch{}

@@ -57,12 +57,16 @@ export default function FinancasPage() {
   const [defaultType, setDefaultType] = useState<"expense" | "income">("expense");
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [minMonth, setMinMonth] = useState(thisMonth);
+  const [summary, setSummary] = useState<{ totalBalance: number; accountBalances: Record<string, number>; month: { income: number; expense: number; count: number } } | null>(null);
 
   useEffect(() => {
     fetch("/api/finance/meta").then((response) => response.ok ? response.json() : null).then((payload) => {
       if (payload?.data?.createdAt) setMinMonth(saoPauloMonthKey(payload.data.createdAt));
     }).catch(() => {});
   }, []);
+  useEffect(() => {
+    fetch(`/api/finance/summary?month=${monthKey}`).then((response) => response.ok ? response.json() : null).then((payload) => setSummary(payload?.data ?? null)).catch(() => setSummary(null));
+  }, [monthKey]);
 
   const stats = useMemo(() => {
     const current = monthStats(transactions, monthKey);
@@ -121,6 +125,7 @@ export default function FinancasPage() {
   const activeAccounts = accounts.filter((a) => a.is_active);
   const isFuture = monthKey >= thisMonth;
   const isBeforeHistory = monthKey <= minMonth;
+  const current = summary?.month ? { ...stats.current, ...summary.month, net: summary.month.income - summary.month.expense } : stats.current;
 
   return (
     <div className="space-y-5">
@@ -194,12 +199,12 @@ export default function FinancasPage() {
           <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--faint)]">Gasto no mês</p>
           <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-3">
             <p className="text-[32px] sm:text-[38px] font-semibold tracking-[-0.03em] leading-none tnum">
-              {formatBRL(stats.current.expense)}
+               {formatBRL(current.expense)}
             </p>
-            <DeltaChip pct={stats.pct} invert />
+             <DeltaChip pct={stats.pct} invert />
           </div>
 
-          {stats.current.count > 0 && (
+          {current.count > 0 && (
             <div className="mt-4">
               <Sparkline points={stats.series} height={56} />
             </div>
@@ -208,21 +213,21 @@ export default function FinancasPage() {
           <div className="mt-4 grid grid-cols-3 gap-3">
             <div>
               <p className="text-[10.5px] uppercase tracking-[0.06em] text-[var(--faint)]">Entrou</p>
-              <p className="text-[14px] font-semibold tnum mt-1">{formatBRL(stats.current.income)}</p>
+               <p className="text-[14px] font-semibold tnum mt-1">{formatBRL(current.income)}</p>
             </div>
             <div>
               <p className="text-[10.5px] uppercase tracking-[0.06em] text-[var(--faint)]">Sobrou</p>
               <p
                 className={`text-[14px] font-semibold tnum mt-1 ${
-                  stats.current.net < 0 ? "text-[var(--negative)]" : "text-[var(--positive)]"
+                   current.net < 0 ? "text-[var(--negative)]" : "text-[var(--positive)]"
                 }`}
               >
-                {formatBRL(stats.current.net)}
+                 {formatBRL(current.net)}
               </p>
             </div>
             <div>
               <p className="text-[10.5px] uppercase tracking-[0.06em] text-[var(--faint)]">Lançamentos</p>
-              <p className="text-[14px] font-semibold tnum mt-1">{stats.current.count}</p>
+               <p className="text-[14px] font-semibold tnum mt-1">{current.count}</p>
             </div>
           </div>
         </section>

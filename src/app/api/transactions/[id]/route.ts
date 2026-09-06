@@ -14,7 +14,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = transactionPatchSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { data, error } = await supabase.rpc("update_transaction_with_audit", {
+  const { data, error } = await supabase.rpc("update_transaction_guarded_with_audit", {
     p_id: id,
     // envia o payload VALIDADO, não o json cru
     p_patch: parsed.data as unknown as Record<string, unknown>,
@@ -36,7 +36,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  const { error } = await supabase.rpc("delete_transaction_with_audit", {
+  const { error } = await supabase.rpc("delete_transaction_guarded_with_audit", {
     p_id: id,
   });
 

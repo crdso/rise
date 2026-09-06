@@ -14,7 +14,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = debtPaymentSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const p = parsed.data;
-  const { data, error } = await supabase.rpc("add_debt_payment_with_audit", {
+  const idempotencyKey = req.headers.get("Idempotency-Key");
+  if (!idempotencyKey) return NextResponse.json({ error: "Idempotency-Key obrigatória" }, { status: 400 });
+  const { data, error } = await supabase.rpc("add_debt_payment_idempotent_with_audit", {
+    p_idempotency_key: idempotencyKey,
     p_debt_id: id,
     p_amount: p.amount,
     p_paid_at: p.paid_at ? new Date(p.paid_at).toISOString() : new Date().toISOString(),

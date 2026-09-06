@@ -12,7 +12,9 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = url.searchParams.get("q");
   const type = url.searchParams.get("type");
-  let query = supabase.from("transactions").select("*, account:accounts(*), category:transaction_categories(*)").eq("user_id", user.id).order("occurred_at", { ascending: false }).limit(80);
+  const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
+  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 80)));
+  let query = supabase.from("transactions").select("*, account:accounts(*), category:transaction_categories(*)").eq("user_id", user.id).order("occurred_at", { ascending: false }).range(offset, offset + limit - 1);
   if (type) query = query.eq("type", type);
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -31,8 +33,11 @@ export async function POST(req: Request) {
   const parsed = transactionSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const rest = parsed.data as unknown as { category_id?: string | null; category_name?: string | null; account_id?: string | null; type: string; amount: number; description?: string | null; occurred_at: string; notes?: string | null; payment_method?: string | null; is_recurring?: boolean };
+  const idempotencyKey = req.headers.get("Idempotency-Key");
+  if (!idempotencyKey) return NextResponse.json({ error: "Idempotency-Key obrigatória" }, { status: 400 });
 
-  const { data, error } = await supabase.rpc("create_transaction_with_audit", {
+  const { data, error } = await supabase.rpc("create_transaction_idempotent_with_audit", {
+    p_idempotency_key: idempotencyKey,
     p_type: rest.type,
     p_amount: rest.amount,
     p_description: rest.description ?? null,

@@ -13,6 +13,7 @@ import { formatBRL } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { totalBalance } from "@/lib/finance/analytics";
 import { ACCOUNT_TYPE_LABEL } from "@/components/rise/AccountTile";
+import { currentMonthKey } from "@/lib/finance/analytics";
 
 function AccountReorderItem({ account, onDragEnd, children }: { account: import("@/types/finance").Account; onDragEnd: () => void; children: (startDrag: (event: React.PointerEvent) => void) => React.ReactNode }) {
   const controls = useDragControls();
@@ -25,7 +26,11 @@ export default function ContasPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [orderedAccounts, setOrderedAccounts] = useState(accounts);
+  const [accountBalances, setAccountBalances] = useState<Record<string, number> | null>(null);
   useEffect(() => setOrderedAccounts(accounts), [accounts]);
+  useEffect(() => {
+    fetch(`/api/finance/summary?month=${currentMonthKey()}`).then((response) => response.ok ? response.json() : null).then((payload) => setAccountBalances(payload?.data?.accountBalances ?? null)).catch(() => setAccountBalances(null));
+  }, []);
   const initial = editing ? accounts.find(a=>a.id===editing) || null : null;
   const activeAccounts = useMemo(() => accounts.filter((account) => account.is_active), [accounts]);
   const activeTotal = useMemo(() => totalBalance(accounts, transactions), [accounts, transactions]);
@@ -80,7 +85,7 @@ export default function ContasPage() {
 
       <Reorder.Group axis="y" values={orderedAccounts} onReorder={setOrderedAccounts} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {orderedAccounts.map((a) => {
-          const bal = calcAccountBalance(a, transactions);
+          const bal = accountBalances?.[a.id] ?? calcAccountBalance(a, transactions);
           return (
             <AccountReorderItem key={a.id} account={a} onDragEnd={persistOrder}>
               {(startDrag) => <>
