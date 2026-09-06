@@ -20,6 +20,13 @@ export type BrandInfo = {
 const cache = new Map<string, { data: BrandInfo; expires: number }>();
 const TTL = 1000 * 60 * 60 * 24;
 
+export function normalizeBrandDomain(value: string): string | null {
+  const domain = value.toLowerCase().trim();
+  // Accept hostnames only: no URLs, local names, IPs, paths, or query strings.
+  if (!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)) return null;
+  return domain;
+}
+
 function pickLogo(logos?: BrandfetchResponse["logos"]): { logo: string | null; icon: string | null } {
   if (!logos || logos.length === 0) return { logo: null, icon: null };
   // prefere SVG transparente, depois PNG transparente
@@ -43,7 +50,8 @@ function pickLogo(logos?: BrandfetchResponse["logos"]): { logo: string | null; i
 }
 
 export async function fetchBrand(domain: string): Promise<BrandInfo | null> {
-  const key = domain.toLowerCase().trim();
+  const key = normalizeBrandDomain(domain);
+  if (!key) return null;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expires > now) return cached.data;
